@@ -25,14 +25,24 @@
   <div class="admin-shell">
     <form class="card" id="login" autocomplete="on">
       <h2>Sign in</h2>
-      <p class="muted">Only the club admin can add matches.</p>
-      <input type="text" name="username" value="admin" autocomplete="username" hidden>
+      <p class="muted">Only the club admin can add matches. Sign in with the admin key, a GitHub token that can only start this site's update job.</p>
+      <input type="text" name="username" value="tbf-admin" autocomplete="username" hidden>
       <div class="field">
-        <label for="pw">Password</label>
-        <input id="pw" type="password" autocomplete="current-password" required>
+        <label for="pw">Admin key</label>
+        <input id="pw" type="password" autocomplete="current-password" required placeholder="github_pat_…">
       </div>
+      <label class="switch" style="margin:0 0 14px"><input type="checkbox" id="remember" checked> Remember on this device</label><br>
       <button class="btn" type="submit">Continue</button>
       <div class="msg" id="login-msg" role="status"></div>
+      <details style="margin-top:16px">
+        <summary class="muted" style="cursor:pointer">How do I get an admin key?</summary>
+        <ol class="muted" style="padding-left:20px;line-height:1.7">
+          <li>Open <a href="https://github.com/settings/personal-access-tokens/new?name=TBF%20cricket%20admin&amp;description=Starts%20match%20parsing%20for%20omkarbhilare.com%2Fcricket&amp;target_name=ombhilare999&amp;expires_in=366&amp;actions=write&amp;contents=read" target="_blank" rel="noopener">GitHub → new fine-grained token</a>.</li>
+          <li>Repository access: <b>Only select repositories</b> → <code>ombhilare999/cricket</code>.</li>
+          <li>Permissions → Repository: <b>Actions: Read and write</b>, <b>Contents: Read-only</b>. Nothing else.</li>
+          <li>Generate the token, copy it, and paste it above.</li>
+        </ol>
+      </details>
     </form>
 
     <div id="panel" hidden>
