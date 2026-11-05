@@ -39,6 +39,15 @@ jobs:
           cp data/*.json _site/data/
           cp -r data/matches _site/data/
           touch _site/.nojekyll
+      - name: Version script and style URLs
+        # GitHub Pages lets browsers cache files for 10 minutes. Stamping every script/style
+        # URL (and every module import) with the commit makes a deploy load as one set,
+        # instead of new pages mixing with cached old modules.
+        run: |
+          V="${GITHUB_SHA::8}"
+          find _site -name '*.html' -exec sed -i -E "s#((src|href)=\"[^\"]*assets/[^\"]+\.(js|css))\"#\1?v=$V\"#g" {} +
+          find _site/assets/js -name '*.js' -exec sed -i -E "s#(from '\./[^']+\.js)'#\1?v=$V'#g" {} +
+          grep -c "?v=$V" _site/index.html _site/admin/index.html _site/assets/js/admin.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
