@@ -1,1 +1,205 @@
-{"generatedAt":null,"matches":[]}
+{
+ "generatedAt": "2026-11-05T05:40:04.489Z",
+ "unmatchedNames": [],
+ "matches": [
+  {
+   "id": "mississaugacricketleague-8556",
+   "matchId": 8556,
+   "clubId": 2565,
+   "league": "MississaugaCricketLeague",
+   "tournament": "mcl",
+   "scorecardUrl": "https://cricclubs.com/MississaugaCricketLeague/fullScorecard.do?clubId=2565&matchId=8556",
+   "parsedAt": "2026-11-05T05:40:04.247Z",
+   "source": "pdf",
+   "title": null,
+   "date": "2026-10-31",
+   "teams": [
+    "Hunters CC",
+    "True Blue Falcons"
+   ],
+   "opponent": "Hunters CC",
+   "result": "True Blue Falcons won by 8 Wickets",
+   "notes": [],
+   "players": [
+    {
+     "name": "Hardik Manchanda",
+     "playerId": "hardik-manchanda",
+     "batted": true,
+     "bowled": false,
+     "bat": {
+      "pos": 1,
+      "runs": 21,
+      "balls": 9,
+      "fours": 1,
+      "sixes": 2,
+      "notOut": false,
+      "dismissal": "b Taimoor M"
+     }
+    },
+    {
+     "name": "Alston D'Mello",
+     "playerId": "alston-d-mello",
+     "batted": true,
+     "bowled": false,
+     "bat": {
+      "pos": 2,
+      "runs": 54,
+      "balls": 48,
+      "fours": 4,
+      "sixes": 2,
+      "notOut": true,
+      "dismissal": ""
+     }
+    },
+    {
+     "name": "Hritik Kumar Advani",
+     "playerId": "hritik-kumar-advani",
+     "batted": true,
+     "bowled": false,
+     "bat": {
+      "pos": 3,
+      "runs": 24,
+      "balls": 18,
+      "fours": 2,
+      "sixes": 0,
+      "notOut": false,
+      "dismissal": "ct (Tarun A) Arsh B"
+     }
+    },
+    {
+     "name": "Rana Mulhim Nadeem",
+     "playerId": "rana-mulhim-nadeem",
+     "batted": true,
+     "bowled": true,
+     "bat": {
+      "pos": 4,
+      "runs": 6,
+      "balls": 3,
+      "fours": 0,
+      "sixes": 1,
+      "notOut": true,
+      "dismissal": ""
+     },
+     "bowl": {
+      "overs": "1",
+      "balls": 6,
+      "maidens": 0,
+      "runs": 8,
+      "wickets": 0,
+      "wides": 4,
+      "noballs": 0,
+      "dots": 0
+     }
+    },
+    {
+     "name": "Rajat Kumar Sinha",
+     "playerId": "rajat-kumar-sinha",
+     "batted": false,
+     "bowled": true,
+     "bowl": {
+      "overs": "3",
+      "balls": 18,
+      "maidens": 0,
+      "runs": 17,
+      "wickets": 2,
+      "wides": 5,
+      "noballs": 1,
+      "dots": 0
+     }
+    },
+    {
+     "name": "Zohaib Hassan",
+     "playerId": "zohaib-hassan",
+     "batted": false,
+     "bowled": true,
+     "bowl": {
+      "overs": "3",
+      "balls": 18,
+      "maidens": 0,
+      "runs": 17,
+      "wickets": 3,
+      "wides": 2,
+      "noballs": 0,
+      "dots": 0
+     }
+    },
+    {
+     "name": "Sadan Amin",
+     "playerId": "sadan-amin",
+     "batted": false,
+     "bowled": false
+    },
+    {
+     "name": "Ayush Aran",
+     "playerId": "ayush-aran",
+     "batted": false,
+     "bowled": true,
+     "bowl": {
+      "overs": "3",
+      "balls": 18,
+      "maidens": 1,
+      "runs": 17,
+      "wickets": 0,
+      "wides": 2,
+      "noballs": 1,
+      "dots": 0
+     }
+    },
+    {
+     "name": "Vishal Radhakrishnan",
+     "playerId": "vishal-radhakrishnan",
+     "batted": false,
+     "bowled": true,
+     "bowl": {
+      "overs": "2",
+      "balls": 12,
+      "maidens": 0,
+      "runs": 24,
+      "wickets": 0,
+      "wides": 6,
+      "noballs": 0,
+      "dots": 0
+     }
+    },
+    {
+     "name": "Vivek Chauhan",
+     "playerId": "vivek-chauhan",
+     "batted": false,
+     "bowled": true,
+     "bowl": {
+      "overs": "2",
+      "balls": 12,
+      "maidens": 0,
+      "runs": 26,
+      "wickets": 1,
+      "wides": 2,
+      "noballs": 0,
+      "dots": 0
+     }
+    },
+    {
+     "name": "Vansh Tyagi",
+     "playerId": "vansh-tyagi",
+     "batted": false,
+     "bowled": true,
+     "bowl": {
+      "overs": "1",
+      "balls": 6,
+      "maidens": 0,
+      "runs": 9,
+      "wickets": 1,
+      "wides": 8,
+      "noballs": 1,
+      "dots": 0
+     }
+    },
+    {
+     "name": "Dhruv Sardana",
+     "playerId": "dhruv-sardana",
+     "batted": false,
+     "bowled": false
+    }
+   ]
+  }
+ ]
+}
