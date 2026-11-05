@@ -1,0 +1,91 @@
+name: Update site
+
+# One workflow does both jobs:
+#  - workflow_dispatch with a CricClubs URL (sent by the admin page) -> parse the match, commit the data, deploy
+#  - push to main -> run tests and deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      url:
+        description: CricClubs ball-by-ball or scorecard link (leave empty to just redeploy)
+        required: false
+        type: string
+      tournament:
+        description: Tournament
+        required: false
+        default: auto
+        type: choice
+        options: [auto, lakeshore, mcl]
+
+run-name: ${{ inputs.url && format('Parse match {0}', inputs.url) || format('Deploy {0}', github.sha) }}
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# never let two runs write data at the same time
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    if: github.event_name == 'workflow_dispatch' && inputs.url != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Parse match
+        env:
+          MATCH_URL: ${{ inputs.url }}
+          TOURNAMENT: ${{ inputs.tournament }}
+        run: node scripts/ingest.mjs --url "$MATCH_URL" --tournament "$TOURNAMENT"
+      - name: Commit data
+        env:
+          MATCH_URL: ${{ inputs.url }}
+        run: |
+          git config user.name "tbf-stats-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git commit -m "Add match: $MATCH_URL"
+          git push
+
+  deploy:
+    needs: ingest
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }} # include the commit the ingest job just pushed
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Rebuild season.json (picks up roster alias edits)
+        run: node scripts/build-season.mjs
+      - name: Assemble site
+        run: |
+          mkdir -p _site/data
+          cp -r index.html admin.html assets _site/
+          cp data/*.json _site/data/
+          cp -r data/matches _site/data/
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

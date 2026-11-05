@@ -1,0 +1,16 @@
+{
+  "name": "true-blue-falcons-stats",
+  "private": true,
+  "type": "module",
+  "description": "Season statistics site for True Blue Falcons cricket club",
+  "scripts": {
+    "ingest": "node scripts/ingest.mjs",
+    "build-season": "node scripts/build-season.mjs",
+    "serve": "node scripts/serve.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "cheerio": "1.0.0"
+  },
+  "engines": { "node": ">=20" }
+}

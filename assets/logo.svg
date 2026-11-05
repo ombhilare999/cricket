@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140" role="img" aria-label="True Blue Falcons crest">
+  <defs>
+    <linearGradient id="sh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f6fe4"/>
+      <stop offset="1" stop-color="#0b2a6b"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bcd6ff"/>
+    </linearGradient>
+  </defs>
+  <!-- shield -->
+  <path d="M60 4 L112 18 V64 C112 98 90 122 60 136 C30 122 8 98 8 64 V18 Z" fill="url(#sh)" stroke="#9cc3ff" stroke-width="3"/>
+  <path d="M60 13 L104 25 V64 C104 93 85 114 60 127 C35 114 16 93 16 64 V25 Z" fill="none" stroke="#ffffff" stroke-opacity=".25" stroke-width="1.5"/>
+  <!-- falcon: head in profile facing left, swept wing behind -->
+  <path d="M96 40 C84 44 74 52 68 62 C80 58 92 58 100 62 C96 56 95 48 96 40 Z" fill="#7fb2ff"/>
+  <path d="M74 34 C62 28 46 30 38 40 C33 46 31 52 28 56 L40 54 C38 60 40 68 46 74 C52 80 56 90 56 100 C64 92 70 82 72 70 C74 60 80 50 74 34 Z" fill="url(#wing)"/>
+  <!-- hooked beak -->
+  <path d="M38 40 C33 42 28 47 27 54 C30 51 33 50 36 51 C35 48 36 44 38 40 Z" fill="#f2b632"/>
+  <!-- eye and cheek stripe -->
+  <circle cx="47" cy="44" r="3.4" fill="#0b2a6b"/>
+  <circle cx="46.2" cy="43.2" r="1" fill="#fff"/>
+  <path d="M50 47 C52 54 52 60 48 66" stroke="#0b2a6b" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- ball -->
+  <circle cx="82" cy="98" r="9" fill="#d23b3b" stroke="#fff" stroke-width="1.5"/>
+  <path d="M76 92 C80 96 80 100 76 104 M88 92 C84 96 84 100 88 104" stroke="#fff" stroke-width="1" fill="none"/>
+</svg>

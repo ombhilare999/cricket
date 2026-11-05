@@ -1,0 +1,19 @@
+{
+  "teamName": "True Blue Falcons",
+  "teamAliases": ["True Blue Falcons", "Blue Falcons", "TBF"],
+  "season": "2026",
+  "totalMatches": 24,
+  "playersPerSide": 11,
+  "ballsPerOver": 6,
+  "logo": "assets/logo.svg",
+  "tiers": {
+    "full": { "label": "Full member", "cap": 16, "priority": 1 },
+    "half": { "label": "Half member", "cap": 8, "priority": 2 },
+    "none": { "label": "Per match", "cap": null, "priority": 3 }
+  },
+  "tournaments": [
+    { "id": "lakeshore", "name": "Lakeshore", "short": "LCL", "urlKeywords": ["lakeshore"] },
+    { "id": "mcl", "name": "Mississauga Cricket League", "short": "MCL", "urlKeywords": ["mississauga"] }
+  ],
+  "adminApi": "https://tbf-cricket-admin.YOUR-SUBDOMAIN.workers.dev"
+}

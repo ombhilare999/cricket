@@ -1,0 +1,235 @@
+{
+  "players": [
+    {
+      "id": "aayush-asthana",
+      "first": "Aayush",
+      "last": "Asthana",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "abhay-thakur",
+      "first": "Abhay",
+      "last": "Thakur",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "aditya-peri",
+      "first": "Aditya",
+      "last": "Peri",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "ali-naqvi",
+      "first": "Ali",
+      "last": "Naqvi",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "alston-d-mello",
+      "first": "Alston",
+      "last": "D'mello",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "asad-naqvi",
+      "first": "Asad",
+      "last": "Naqvi",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "ayush-aran",
+      "first": "Ayush",
+      "last": "Aran",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "chirag-sethi",
+      "first": "Chirag",
+      "last": "Sethi",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "daniyal-mehdi",
+      "first": "Daniyal",
+      "last": "Mehdi",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "dhruv-sardana",
+      "first": "Dhruv",
+      "last": "Sardana",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "faheem-shoaib",
+      "first": "Faheem",
+      "last": "Shoaib",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "hardik-manchanda",
+      "first": "Hardik",
+      "last": "Manchanda",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "hritik-kumar-advani",
+      "first": "Hritik Kumar",
+      "last": "Advani",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "jaideep-bajwa",
+      "first": "Jaideep",
+      "last": "Bajwa",
+      "tier": "half",
+      "aliases": []
+    },
+    {
+      "id": "mujtaba-kasmani",
+      "first": "Mujtaba",
+      "last": "Kasmani",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "naman-mamtani",
+      "first": "Naman",
+      "last": "Mamtani",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "omer-sheraz-rana",
+      "first": "Omer Sheraz",
+      "last": "Rana",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "omkar-bhilare",
+      "first": "Omkar",
+      "last": "Bhilare",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "rajat-kumar-sinha",
+      "first": "Rajat Kumar",
+      "last": "Sinha",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "rana-mulhim-nadeem",
+      "first": "Rana Mulhim",
+      "last": "Nadeem",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "reyansh-kapoor",
+      "first": "Reyansh",
+      "last": "Kapoor",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "saarthak-singh",
+      "first": "Saarthak",
+      "last": "Singh",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "sadan-amin",
+      "first": "Sadan",
+      "last": "Amin",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "sadyanta-malik",
+      "first": "Sadyanta",
+      "last": "Malik",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "shailin-gosalia",
+      "first": "Shailin",
+      "last": "Gosalia",
+      "tier": "half",
+      "aliases": []
+    },
+    {
+      "id": "shayan-amin",
+      "first": "Shayan",
+      "last": "Amin",
+      "tier": "half",
+      "aliases": []
+    },
+    {
+      "id": "shreyes-dugar",
+      "first": "Shreyes",
+      "last": "Dugar",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "talha-saeed",
+      "first": "Talha",
+      "last": "Saeed",
+      "tier": "none",
+      "aliases": []
+    },
+    {
+      "id": "vansh-tyagi",
+      "first": "Vansh",
+      "last": "Tyagi",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "vishal-radhakrishnan",
+      "first": "Vishal",
+      "last": "Radhakrishnan",
+      "tier": "half",
+      "aliases": []
+    },
+    {
+      "id": "vivek-chauhan",
+      "first": "Vivek",
+      "last": "Chauhan",
+      "tier": "full",
+      "aliases": []
+    },
+    {
+      "id": "zohaib-hassan",
+      "first": "Zohaib",
+      "last": "Hassan",
+      "tier": "half",
+      "aliases": []
+    },
+    {
+      "id": "zubair-arif",
+      "first": "Zubair",
+      "last": "Arif",
+      "tier": "none",
+      "aliases": []
+    }
+  ]
+}
