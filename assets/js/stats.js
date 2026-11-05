@@ -1,4 +1,4 @@
-// Pure aggregation helpers, shared by the main page and the admin page.
+// Pure aggregation helpers for the stats page.
 (function (root) {
   'use strict';
 

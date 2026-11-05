@@ -5,37 +5,31 @@ A static stats site for the True Blue Falcons cricket club, served at **omkarbhi
 ## How it fits together
 
 ```
-Admin page (admin.html), signed in with the admin key
-        │ checks the match hasn't been parsed, then starts the workflow (GitHub API)
+"Add a match" page (add.html): anyone pastes a CricClubs full scorecard link
+        │ opens a pre-filled GitHub issue ("Add match: MCL 8556")
         ▼
-GitHub Actions "Update site" (.github/workflows/site.yml)
-  1. downloads the CricClubs scorecard + ball-by-ball pages
-  2. parses our players' stats → data/matches/<league>-<matchId>.json
-  3. commits, rebuilds data/season.json, deploys to GitHub Pages
+GitHub Actions "Update site" (.github/workflows/site.yml), triggered by the issue
+  1. downloads the full scorecard
+  2. checks the rules (below); if any fails → explains why on the issue and closes it
+  3. saves our players' stats → data/matches/<league>-<matchId>.json, commits
+  4. replies on the issue with the parsed stats, closes it, deploys to GitHub Pages
         ▼
 omkarbhilare.com/cricket  (index.html renders data/season.json)
 ```
 
-* **No server and no database.** Every match is a JSON file in `data/matches/`, so the history is in git.
-* **Admin key.** The site is static, so it can't keep a password. The admin signs in with a fine-grained GitHub token instead, and that token can do one thing: start this repo's workflow. It lives only in the admin's browser. Without it the admin page does nothing.
-* **Each match is parsed only once.** The admin page checks before starting the workflow, and the ingest script refuses a match whose data file already exists.
+* **No server, no database, no admin.** Every match is a JSON file in `data/matches/`, so the history is in git. Submitting needs a free GitHub account.
 * **Your portfolio is not touched.** Your user site (`ombhilare999.github.io`) already uses the custom domain `omkarbhilare.com`. GitHub Pages serves this `cricket` repo at `omkarbhilare.com/cricket/`.
 
-## Admin key (one time)
+## Rules for adding a match
 
-1. Create a token with [this pre-filled link](https://github.com/settings/personal-access-tokens/new?name=TBF%20cricket%20admin&target_name=ombhilare999&expires_in=366&actions=write&contents=read). If the form doesn't pick up the settings, choose them by hand:
-   * Repository access: **Only select repositories** → `ombhilare999/cricket`
-   * Repository permissions: **Actions: Read and write**, **Contents: Read-only**
-2. Open `omkarbhilare.com/cricket/admin.html`, paste the token as the admin key and tick *Remember on this device*.
+A match is added only if:
 
-Tokens expire, after a year at most. When yours does, the admin page will say the key wasn't accepted, and you create a new one the same way.
+1. the link is `https://cricclubs.com/<League>/fullScorecard.do?...&matchId=<n>` and the league is one of ours (Lakeshore or Mississauga Cricket League),
+2. the scorecard shows the team **True Blue Falcons** by its exact name (`teamName` in `data/config.json`),
+3. **every** True Blue Falcons player on the scorecard (batters, did-not-bat, bowlers) matches a roster name in `data/players.json` exactly, or one of that player's `aliases`. Case, extra spaces, apostrophes and markers like `(c)`, `(wk)`, `*` and `†` are ignored. Initials, nicknames and partial names are not accepted.
+4. the match has not been added before.
 
-## Adding a match
-
-On the admin page, paste the CricClubs link and press **Parse match**. Either the ball-by-ball link or the scorecard link works, for example:
-`https://cricclubs.com/MississaugaCricketLeague/ballbyball.do?clubId=2565&matchId=8556`
-
-The tournament is detected from the link (`Mississauga…` → MCL, `Lakeshore…` → Lakeshore), or you can pick it yourself. The stats update about a minute later. Each run's summary on GitHub lists every player it found and how it matched them to the roster.
+If a real player's CricClubs name differs from the roster (for example `Hritik Advani` against roster `Hritik Kumar Advani`), the submission is rejected and the issue names them. Add the CricClubs spelling to that player's `aliases` (or add a new player), push, and submit again.
 
 **Fallback:** go to GitHub → Actions → *Update site* → *Run workflow* and paste the link there.
 
@@ -43,11 +37,10 @@ The tournament is detected from the link (`Mississauga…` → MCL, `Lakeshore�
 
 | Problem | Fix |
 |---|---|
-| A CricClubs name didn't match a member (listed under *Names to check* on the admin page) | Add it to that player's `aliases` in `data/players.json`, then push. Old matches pick it up automatically. |
 | A player fielded but neither batted nor bowled, and is missing from the card | Add `"extraPlayers": ["player-id"]` to that match's file in `data/matches/` |
 | Wrong date | Add `"dateOverride": "2026-06-14"` to the match file |
 | Roster or tier change | Edit `data/players.json` (`tier`: `full`, `half` or `none`) |
-| Parser improved and you want to re-read old matches | `node scripts/ingest.mjs --url <link> --reparse` re-reads the raw pages saved in `data/raw/` |
+| Parser improved and you want to re-read old matches | `node scripts/ingest.mjs --url <link> --reparse` re-reads the raw page saved in `data/raw/` |
 
 ## Display rules
 

@@ -260,7 +260,7 @@
   function renderMatches(agg) {
     const list = agg.matches.slice().reverse();
     if (!list.length) {
-      $('match-list').innerHTML = '<div class="card empty" style="grid-column:1/-1"><strong>No matches yet</strong>The admin adds each match from its CricClubs link, and the stats appear here a minute later.</div>';
+      $('match-list').innerHTML = '<div class="card empty" style="grid-column:1/-1"><strong>No matches yet</strong>Anyone can add a match from its CricClubs full scorecard. <a href="add.html">Add the first one</a>.</div>';
       return;
     }
     const byId = new Map(players.map((p) => [p.id, p]));
@@ -283,8 +283,7 @@
         '<div><small>Top bowl</small>' + (topBowl ? who(topBowl) + ' · <b class="num">' + topBowl.bowl.wickets + '/' + topBowl.bowl.runs + '</b> (' + esc(topBowl.bowl.overs) + ')' : '–') + '</div>' +
         '</div>' +
         '<div class="links"><span class="muted">' + new Set(ours.map((r) => r.playerId || r.name)).size + ' players</span>' +
-        '<a href="' + esc(m.scorecardUrl) + '" target="_blank" rel="noopener">Scorecard ↗</a>' +
-        '<a href="' + esc(m.ballByBallUrl) + '" target="_blank" rel="noopener">Ball by ball ↗</a></div>' +
+        '<a href="' + esc(m.scorecardUrl) + '" target="_blank" rel="noopener">Scorecard ↗</a></div>' +
         '</article>';
     }).join('');
   }

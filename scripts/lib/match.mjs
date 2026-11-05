@@ -1,33 +1,47 @@
-// Turns parsed CricClubs pages into one match record for our team.
+// Turns a CricClubs full scorecard into one match record for our team, and
+// enforces the submission rules:
+//   1. the link is a cricclubs.com fullScorecard.do link with a matchId
+//   2. the scorecard names our team exactly (config.teamName)
+//   3. every one of our players on the card is on the roster, by exact name or alias
 
 import { buildMatcher, norm } from './names.mjs';
-import { parseScorecard, parseBallByBall } from './parse.mjs';
+import { parseScorecard } from './parse.mjs';
 
-/** Pull league / clubId / matchId out of any CricClubs match URL. */
+export class RejectedMatch extends Error {}
+
+const LINK_RE = /https:\/\/(?:www\.)?cricclubs\.com\/[A-Za-z0-9_-]+\/fullScorecard\.do\?[^\s<>"')\]]+/i;
+
+/** Find the first full-scorecard link in free text (e.g. an issue body). */
+export function findScorecardLink(text) {
+  const m = String(text || '').match(LINK_RE);
+  return m ? m[0].replace(/&amp;/g, '&') : null;
+}
+
+/** Validate a full-scorecard link and pull out league / clubId / matchId. */
 export function parseMatchUrl(input) {
   let u;
   try {
     u = new URL(String(input).trim());
   } catch {
-    throw new Error('That is not a valid URL.');
+    throw new RejectedMatch('That is not a valid link.');
   }
-  if (!/(^|\.)cricclubs\.com$/i.test(u.hostname)) throw new Error('URL must be on cricclubs.com');
-  const league = u.pathname.split('/').filter(Boolean)[0];
+  if (u.protocol !== 'https:' || !/^(www\.)?cricclubs\.com$/i.test(u.hostname)) throw new RejectedMatch('The link must be on https://cricclubs.com.');
+  const parts = u.pathname.split('/').filter(Boolean);
+  const league = parts[0];
+  if (parts.length !== 2 || parts[1].toLowerCase() !== 'fullscorecard.do') {
+    throw new RejectedMatch('Use the full scorecard link, for example https://cricclubs.com/MississaugaCricketLeague/fullScorecard.do?clubId=2565&matchId=8556');
+  }
   const q = Object.fromEntries([...u.searchParams].map(([k, v]) => [k.toLowerCase(), v]));
-  const matchId = q.matchid;
-  const clubId = q.clubid;
-  if (!league || !/^[A-Za-z0-9_-]+$/.test(league)) throw new Error('Could not find the league name in the URL path.');
-  if (!/^\d+$/.test(matchId || '')) throw new Error('URL must contain matchId=<number>.');
-  if (clubId && !/^\d+$/.test(clubId)) throw new Error('clubId must be a number.');
-  const base = `https://cricclubs.com/${league}`;
-  const qs = `matchId=${matchId}${clubId ? `&clubId=${clubId}` : ''}`;
+  if (!/^[A-Za-z0-9_-]+$/.test(league || '')) throw new RejectedMatch('Could not find the league name in the link.');
+  if (!/^\d+$/.test(q.matchid || '')) throw new RejectedMatch('The link must contain matchId=<number>.');
+  if (q.clubid && !/^\d+$/.test(q.clubid)) throw new RejectedMatch('clubId must be a number.');
+  const qs = `${q.clubid ? `clubId=${q.clubid}&` : ''}matchId=${q.matchid}`;
   return {
     league,
-    matchId: Number(matchId),
-    clubId: clubId ? Number(clubId) : null,
-    id: `${league.toLowerCase()}-${matchId}`,
-    ballByBallUrl: `${base}/ballbyball.do?${qs}`,
-    scorecardUrl: `${base}/viewScorecard.do?${qs}`,
+    matchId: Number(q.matchid),
+    clubId: q.clubid ? Number(q.clubid) : null,
+    id: `${league.toLowerCase()}-${q.matchid}`,
+    scorecardUrl: `https://cricclubs.com/${league}/fullScorecard.do?${qs}`,
   };
 }
 
@@ -48,62 +62,53 @@ function bestCard(cards, getNames, matcher) {
       bestScore = score;
     }
   }
-  return best;
+  return { card: best, score: bestScore };
 }
 
+// "True Blue Falcons", "True Blue Falcons Innings 156/7 (20.0 ov)", "True Blue Falcons 1st Innings"
+// all name the team exactly; "True Blue Falcons B" does not.
+const LABEL_NOISE = /\b(innings|inning|inns|st|nd|ov|overs|batting|bowling|team)\b/g;
+const isTeamLabel = (label, team) => norm(label).replace(LABEL_NOISE, ' ').replace(/\s+/g, ' ').trim() === norm(team);
+
 /**
- * Build a match record from raw HTML.
- * Player rows keep the raw CricClubs name; roster ids are resolved again at
- * build-season time, so adding an alias later fixes old matches too.
+ * Build a match record from the full scorecard HTML, or throw RejectedMatch
+ * explaining which rule failed.
  */
-export function buildMatch({ scorecardHtml, ballByBallHtml, players, config }) {
+export function buildMatch({ scorecardHtml, players, config }) {
   const matcher = buildMatcher(players);
-  const bpo = config.ballsPerOver || 6;
-  let batters = [];
-  let bowlers = [];
-  let dnb = [];
-  let meta = {};
-  let source = null;
-  const notes = [];
+  const sc = parseScorecard(scorecardHtml, { ballsPerOver: config.ballsPerOver || 6 });
 
-  if (scorecardHtml) {
-    const sc = parseScorecard(scorecardHtml, { ballsPerOver: bpo });
-    meta = sc.meta;
-    const bat = bestCard(sc.battingCards, (c) => [...c.batters.map((b) => b.name), ...c.dnb], matcher);
-    const bowl = bestCard(sc.bowlingCards, (c) => c.map((b) => b.name), matcher);
-    if (bat || bowl) {
-      source = 'scorecard';
-      batters = bat ? bat.batters : [];
-      dnb = [...(bat ? bat.dnb : []), ...sc.looseDnb.filter((n) => matcher(n))];
-      bowlers = bowl || [];
-    } else notes.push(`scorecard: no batting/bowling card matched the roster (${sc.battingCards.length} batting, ${sc.bowlingCards.length} bowling cards found)`);
+  // rule 2: our exact team name is on the scorecard
+  const teamOnPage = [...(sc.meta.teams || []), ...sc.labels].some((t) => isTeamLabel(t, config.teamName));
+  if (!teamOnPage) throw new RejectedMatch(`This scorecard is not a ${config.teamName} match: the team name "${config.teamName}" does not appear on it.`);
+  if (!sc.battingCards.length && !sc.bowlingCards.length) throw new RejectedMatch('Could not read any batting or bowling tables on this page. Is it a full scorecard?');
+
+  // our cards are the ones made of roster players
+  const bat = bestCard(sc.battingCards, (c) => [...c.batters.map((b) => b.name), ...c.dnb], matcher);
+  const bowl = bestCard(sc.bowlingCards, (c) => c.map((b) => b.name), matcher);
+  if (!bat.card && !bowl.card) {
+    throw new RejectedMatch(`None of the players on this scorecard are on the ${config.teamName} roster.`);
   }
 
-  if (!source && ballByBallHtml) {
-    const bb = parseBallByBall(ballByBallHtml, { ballsPerOver: bpo });
-    if (!meta.title) meta = bb.meta;
-    const batInn = bestCard(bb.innings, (i) => i.batters.map((b) => b.name), matcher);
-    const bowlInn = bestCard(bb.innings, (i) => i.bowlers.map((b) => b.name), matcher);
-    if (batInn || bowlInn) {
-      source = 'ballbyball';
-      batters = batInn ? batInn.batters : [];
-      bowlers = bowlInn ? bowlInn.bowlers : [];
-      notes.push('ball-by-ball fallback: players who were in the XI but neither batted nor bowled are not detected');
-    } else notes.push(`ball-by-ball: no innings matched the roster (${bb.innings.length} innings found)`);
-  }
+  const batters = bat.card ? bat.card.batters : [];
+  const dnb = [...(bat.card ? bat.card.dnb : []), ...sc.looseDnb.filter((n) => matcher(n))];
+  const bowlers = bowl.card || [];
 
-  if (!source) {
-    const err = new Error(`Could not find True Blue Falcons players on the page. ${notes.join('; ')}`);
-    err.notes = notes;
-    throw err;
+  // rule 3: every one of our players must be on the roster by exact name
+  const unknown = [...new Set([...batters.map((b) => b.name), ...(bat.card ? bat.card.dnb : []), ...bowlers.map((b) => b.name)].filter((n) => !matcher(n)))];
+  if (unknown.length) {
+    throw new RejectedMatch(
+      `These ${config.teamName} players on the scorecard are not on the roster: ${unknown.join(', ')}. ` +
+        'Names must match exactly. Add them to data/players.json (as a new player, or as an alias of an existing one) and submit the match again.',
+    );
   }
 
   // merge into one row per player
   const rows = new Map();
   const row = (name) => {
-    const k = norm(name);
-    if (!rows.has(k)) rows.set(k, { name, batted: false, bowled: false });
-    return rows.get(k);
+    const id = matcher(name);
+    if (!rows.has(id)) rows.set(id, { name, playerId: id, batted: false, bowled: false });
+    return rows.get(id);
   };
   for (const b of batters) Object.assign(row(b.name), { batted: true, bat: { pos: b.pos, runs: b.runs, balls: b.balls, fours: b.fours, sixes: b.sixes, notOut: b.notOut, dismissal: b.dismissal } });
   for (const n of dnb) row(n);
@@ -113,11 +118,14 @@ export function buildMatch({ scorecardHtml, ballByBallHtml, players, config }) {
     r.bowl = { overs: b.overs, balls: b.balls, maidens: b.maidens, runs: b.runs, wickets: b.wickets, wides: b.wides, noballs: b.noballs, dots: b.dots };
   }
 
-  const ours = (meta.teams || []).map((t) => config.teamAliases.some((a) => norm(t).includes(norm(a))));
-  const opponent = (meta.teams || []).find((_, i) => !ours[i]) || null;
+  const meta = sc.meta;
+  const opponent = (meta.teams || []).find((t) => !config.teamAliases.some((a) => norm(t) === norm(a))) || null;
+  const notes = [];
+  if (!bat.card) notes.push('No batting card found for our team.');
+  if (!bowl.card) notes.push('No bowling card found for our team.');
 
   return {
-    source,
+    source: 'scorecard',
     title: meta.title || null,
     date: meta.date || null,
     teams: meta.teams || [],

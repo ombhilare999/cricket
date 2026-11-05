@@ -6,9 +6,6 @@
 // Which card belongs to our team is decided later by matching names to the roster,
 // so we never need to know which team name the page puts above each innings.
 //
-// The ball-by-ball parser is a fallback for when the scorecard can't be read. It turns
-// the page into text lines and reads commentary of the form
-// "12.3  Bowler to Batter, 2 runs".
 
 import * as cheerio from 'cheerio';
 import { cleanName } from './names.mjs';
@@ -227,7 +224,14 @@ export function parseScorecard(html, { ballsPerOver = 6 } = {}) {
   const looseDnb = [];
   const bodyText = pageText($);
   for (const m of bodyText.matchAll(/(?:did not bat|yet to bat)\s*:?\s*([^\n]+)/gi)) looseDnb.push(...splitNames(m[1]));
-  return { battingCards, bowlingCards, looseDnb, meta: parseMeta($, bodyText) };
+  // short text labels (team headers, innings headers, links) for the exact team-name check
+  const labels = new Set();
+  $('body *').each((_, el) => {
+    if ($(el).children().length > 2) return;
+    const t = txt($(el).text());
+    if (t && t.length <= 80) labels.add(t);
+  });
+  return { battingCards, bowlingCards, looseDnb, labels: [...labels], meta: parseMeta($, bodyText) };
 }
 
 function pageText($) {
@@ -277,133 +281,4 @@ export function parseMeta($, bodyText) {
   else if (longRev) date = `${longRev[3]}-${pad(mi(longRev[2]))}-${pad(longRev[1])}`;
 
   return { title, teams, result: result ? txt(result) : null, date };
-}
-
-// ---------------------------------------------------------------- ball by ball
-
-// "12.3 Bowler to Batter, 2 runs", optionally with a run badge after the over number
-// ("12.3 4 Bowler to Batter, FOUR" / "0.2 wd Bowler to Batter, wide").
-const BALL_LINE = /^(\d{1,2})\.(\d{1,2})\s*[-:]?\s*(?:(?:[0-7]|w|wd\d?|nb\d?|lb\d?|b\d)\s+(?=\S+\s+\S))?(.+?)\s+to\s+(.+?)\s*(?:[,:\-–]|\s{2,})\s*(.*)$/i;
-
-/** Classify the commentary after "X to Y,". */
-export function classifyBall(rest) {
-  const r = ` ${rest.toLowerCase()} `;
-  const n = (re) => {
-    const m = r.match(re);
-    return m ? Number(m[1]) : null;
-  };
-  const wide = /\bwides?\b|\bwd\b/.test(r);
-  const noball = /no[\s-]?ball|\bnb\b/.test(r);
-  const legbye = /leg[\s-]?byes?|\blb\b/.test(r);
-  const bye = !legbye && /\bbyes?\b/.test(r);
-  let runs = 0;
-  if (/\bsix\b|\b6 runs\b/.test(r)) runs = 6;
-  else if (/\bfour\b|\b4 runs\b/.test(r)) runs = 4;
-  else runs = n(/\b(\d+)\s*runs?\b/) ?? n(/^\s*(\d)\b/) ?? 0;
-  if (/\bno run\b|\bdot\b/.test(r) && !/\b\d+\s*runs?\b/.test(r)) runs = 0;
-  const wicket = /\bout\b|\bwicket\b|\bbowled\b|\bcaught\b|\blbw\b|\bstumped\b|\bhit wicket\b/.test(r) && !/\bnot out\b/.test(r);
-  const runOut = /\brun\s*out\b/.test(r);
-  return { wide, noball, legbye, bye, runs, wicket, runOut };
-}
-
-/** Parse ball-by-ball commentary into per-innings per-player tallies. */
-export function parseBallByBall(html, { ballsPerOver = 6 } = {}) {
-  const $ = cheerio.load(html);
-  $('script,style,noscript').remove();
-  const lines = pageText($).split('\n');
-  // join "12.3" on its own line with the commentary on the next line
-  const joined = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (/^\d{1,2}\.\d{1,2}$/.test(lines[i]) && lines[i + 1]) {
-      // sometimes a run badge ("1", "W", "4") sits between the over number and the text
-      if (/^([0-9]|w|wd|nb|lb|b)\w?$/i.test(lines[i + 1]) && lines[i + 2]) {
-        joined.push(`${lines[i]} ${lines[i + 2]}`);
-        i += 2;
-      } else {
-        joined.push(`${lines[i]} ${lines[i + 1]}`);
-        i += 1;
-      }
-    } else joined.push(lines[i]);
-  }
-
-  // 1. group commentary lines into innings
-  const groups = [];
-  let cur = null;
-  let lastOver = null;
-  for (const line of joined) {
-    const m = line.match(BALL_LINE);
-    if (!m) continue;
-    const over = Number(m[1]);
-    // A new innings starts where the over number jumps between the first over and a
-    // much later one. Works whether commentary is listed oldest-first or newest-first,
-    // and whether overs are numbered from 0 or 1.
-    const jump = lastOver != null && ((over <= 1 && lastOver >= 4) || (lastOver <= 1 && over >= 4));
-    if (!cur || jump) {
-      cur = [];
-      groups.push(cur);
-    }
-    lastOver = over;
-    cur.push({ over, ball: Number(m[2]), bowler: cleanName(m[3]), batter: cleanName(m[4]), rest: m[5] || '' });
-  }
-
-  // 2. tally each innings in chronological order
-  const innings = groups.map((events) => {
-    if (events.length > 1 && events[0].over * 100 + events[0].ball > events.at(-1).over * 100 + events.at(-1).ball) events.reverse();
-    const inn = { batters: new Map(), bowlers: new Map() };
-    for (const ev of events) {
-      const o = classifyBall(ev.rest);
-      const bat = inn.batters.get(ev.batter) || { name: ev.batter, runs: 0, balls: 0, fours: 0, sixes: 0, out: false };
-      const bowl = inn.bowlers.get(ev.bowler) || { name: ev.bowler, balls: 0, runs: 0, wickets: 0, wides: 0, noballs: 0, dots: 0 };
-      if (o.wide) {
-        bowl.wides += 1;
-        bowl.runs += Math.max(1, o.runs);
-      } else {
-        bat.balls += 1;
-        if (!o.bye && !o.legbye) {
-          bat.runs += o.runs;
-          if (o.runs === 4) bat.fours += 1;
-          if (o.runs === 6) bat.sixes += 1;
-          bowl.runs += o.runs + (o.noball ? 1 : 0);
-        } else if (o.noball) bowl.runs += 1;
-        if (o.noball) bowl.noballs += 1;
-        else {
-          bowl.balls += 1;
-          if (!o.runs && !o.bye && !o.legbye) bowl.dots += 1;
-        }
-      }
-      if (o.wicket && !o.runOut) bowl.wickets += 1;
-      if (o.wicket && !o.runOut) bat.out = true;
-      inn.batters.set(ev.batter, bat);
-      inn.bowlers.set(ev.bowler, bowl);
-    }
-    return inn;
-  });
-
-  const bpo = ballsPerOver;
-  return {
-    innings: innings.map((inn) => ({
-      batters: [...inn.batters.values()].map((b, i) => ({
-        name: b.name,
-        pos: i + 1,
-        runs: b.runs,
-        balls: b.balls,
-        fours: b.fours,
-        sixes: b.sixes,
-        notOut: !b.out,
-        dismissal: b.out ? 'out' : 'not out',
-      })),
-      bowlers: [...inn.bowlers.values()].map((b) => ({
-        name: b.name,
-        overs: `${Math.floor(b.balls / bpo)}.${b.balls % bpo}`,
-        balls: b.balls,
-        maidens: 0,
-        runs: b.runs,
-        wickets: b.wickets,
-        wides: b.wides,
-        noballs: b.noballs,
-        dots: b.dots,
-      })),
-    })),
-    meta: parseMeta($, lines.join('\n')),
-  };
 }

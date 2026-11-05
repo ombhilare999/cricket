@@ -1,0 +1,21 @@
+name: Add a match
+description: Add a True Blue Falcons match to the season stats at omkarbhilare.com/cricket
+title: "Add match"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Paste the **full scorecard** link from CricClubs and press **Create**. A bot checks it, adds the stats, and closes this issue with the result within a couple of minutes.
+
+        A match is added only if:
+        - it is a `fullScorecard.do` link on cricclubs.com,
+        - the scorecard shows the team **True Blue Falcons** (exact name),
+        - every True Blue Falcons player on the scorecard matches a roster name exactly,
+        - it hasn't been added before.
+  - type: input
+    id: scorecard
+    attributes:
+      label: CricClubs full scorecard link
+      placeholder: https://cricclubs.com/MississaugaCricketLeague/fullScorecard.do?clubId=2565&matchId=8556
+    validations:
+      required: true
