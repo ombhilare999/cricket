@@ -4,10 +4,15 @@
 //   2. the scorecard names our team exactly (config.teamName)
 //   3. every one of our players on the card is on the roster, by exact name or alias
 
-import { buildMatcher, norm } from './names.mjs';
-import { parseScorecard } from './parse.mjs';
+import { buildMatcher, norm } from './names.js';
+import { parseScorecard } from './parse.js';
 
-export class RejectedMatch extends Error {}
+export class RejectedMatch extends Error {
+  constructor(message, extra = {}) {
+    super(message);
+    Object.assign(this, extra); // e.g. { unknown: ['Some Name'] } so the admin page can map names to the roster
+  }
+}
 
 const LINK_RE = /https:\/\/(?:www\.)?cricclubs\.com\/[A-Za-z0-9_-]+\/fullScorecard\.do\?[^\s<>"')\]]+/i;
 
@@ -71,12 +76,12 @@ const LABEL_NOISE = /\b(innings|inning|inns|st|nd|ov|overs|batting|bowling|team)
 const isTeamLabel = (label, team) => norm(label).replace(LABEL_NOISE, ' ').replace(/\s+/g, ' ').trim() === norm(team);
 
 /**
- * Build a match record from the full scorecard HTML, or throw RejectedMatch
- * explaining which rule failed.
+ * Build a match record from a parsed full scorecard page (a DOM Document), or throw
+ * RejectedMatch explaining which rule failed.
  */
-export function buildMatch({ scorecardHtml, players, config }) {
+export function buildMatch({ doc, players, config }) {
   const matcher = buildMatcher(players);
-  const sc = parseScorecard(scorecardHtml, { ballsPerOver: config.ballsPerOver || 6 });
+  const sc = parseScorecard(doc, { ballsPerOver: config.ballsPerOver || 6 });
 
   // rule 2: our exact team name is on the scorecard
   const teamOnPage = [...(sc.meta.teams || []), ...sc.labels].some((t) => isTeamLabel(t, config.teamName));
@@ -99,7 +104,8 @@ export function buildMatch({ scorecardHtml, players, config }) {
   if (unknown.length) {
     throw new RejectedMatch(
       `These ${config.teamName} players on the scorecard are not on the roster: ${unknown.join(', ')}. ` +
-        'Names must match exactly. Add them to data/players.json (as a new player, or as an alias of an existing one) and submit the match again.',
+        'Names must match exactly. Link each one to a roster player (it is saved as an alias) or add them as a new player.',
+      { unknown },
     );
   }
 

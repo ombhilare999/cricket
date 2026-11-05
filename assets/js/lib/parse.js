@@ -1,4 +1,5 @@
-// Parsers for CricClubs match pages.
+// Parsers for CricClubs match pages. Plain DOM code, shared by the admin page (browser,
+// DOMParser) and the Node scripts and tests (linkedom).
 //
 // The scorecard parser does not depend on CricClubs CSS class names. It reads every
 // innermost <table>, decides from the header row whether it is a batting card
@@ -7,12 +8,11 @@
 // so we never need to know which team name the page puts above each innings.
 //
 
-import * as cheerio from 'cheerio';
-import { cleanName } from './names.mjs';
+import { cleanName } from './names.js';
 
 const SKIP_ROW = /^(extras?|total|fall of wickets?|did not bat|yet to bat|dnb|bowling|batting|batter|batsman|bowler|byes?)\b/i;
 
-const txt = (s) => String(s || '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+const txt = (s) => String(s || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 const num = (s) => {
   const m = txt(s).match(/^-?\d+(\.\d+)?/);
   return m ? Number(m[0]) : null;
@@ -32,37 +32,35 @@ function headerIndex(headers, names) {
   return -1;
 }
 
-function readTables($) {
+// HTML -> text with a line break wherever the markup had <br> or a block/inline closer
+function htmlText(doc, html) {
+  const box = doc.createElement('div');
+  box.innerHTML = html;
+  return box.textContent || '';
+}
+
+function readTables(doc) {
   const tables = [];
-  $('table').each((_, t) => {
-    if ($(t).find('table').length) return; // layout table, skip; inner tables are read separately
+  for (const t of doc.querySelectorAll('table')) {
+    if (t.querySelector('table')) continue; // layout table, skip; inner tables are read separately
     const rows = [];
-    $(t)
-      .find('tr')
-      .each((__, tr) => {
-        const cells = $(tr)
-          .children('th,td')
-          .map((___, c) => {
-            const $c = $(c);
-            const link = $c.find('a').first();
-            const linkText = link.length ? txt(link.text()) : '';
-            const href = link.attr('href') || '';
-            const pid = (href.match(/playerId=(\d+)/i) || [])[1] || null;
-            // keep line structure inside a cell: name often sits above the dismissal text
-            const html = ($c.html() || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(div|p|span|small|li)>/gi, '\n');
-            const lines = cheerio
-              .load(`<x>${html}</x>`)('x')
-              .text()
-              .split('\n')
-              .map(txt)
-              .filter(Boolean);
-            return { text: txt($c.text()), linkText, lines, pid, colspan: Number($c.attr('colspan') || 1) };
-          })
-          .get();
-        if (cells.length) rows.push(cells);
-      });
+    for (const tr of t.querySelectorAll('tr')) {
+      const cells = [...tr.children]
+        .filter((c) => /^t[dh]$/i.test(c.tagName))
+        .map((c) => {
+          const link = c.querySelector('a');
+          const linkText = link ? txt(link.textContent) : '';
+          const href = (link && link.getAttribute('href')) || '';
+          const pid = (href.match(/playerId=(\d+)/i) || [])[1] || null;
+          // keep line structure inside a cell: name often sits above the dismissal text
+          const html = (c.innerHTML || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(div|p|span|small|li)>/gi, '\n$&');
+          const lines = htmlText(doc, html).split('\n').map(txt).filter(Boolean);
+          return { text: txt(c.textContent), linkText, lines, pid, colspan: Number(c.getAttribute('colspan') || 1) };
+        });
+      if (cells.length) rows.push(cells);
+    }
     if (rows.length) tables.push(rows);
-  });
+  }
   return tables;
 }
 
@@ -203,13 +201,15 @@ function splitNames(s) {
     .filter((n) => n && n.length > 1 && !/^\d/.test(n));
 }
 
-/** Parse a CricClubs full scorecard page into innings cards. */
-export function parseScorecard(html, { ballsPerOver = 6 } = {}) {
-  const $ = cheerio.load(html);
-  $('script,style,noscript').remove();
+/**
+ * Parse a CricClubs full scorecard page into innings cards.
+ * @param {Document} doc a parsed page (DOMParser in the browser, linkedom in Node). Scripts and styles are stripped from it.
+ */
+export function parseScorecard(doc, { ballsPerOver = 6 } = {}) {
+  for (const el of [...doc.querySelectorAll('script,style,noscript,svg')]) el.parentNode.removeChild(el);
   const battingCards = [];
   const bowlingCards = [];
-  for (const rows of readTables($)) {
+  for (const rows of readTables(doc)) {
     const cls = classify(rows);
     if (!cls) continue;
     if (cls.kind === 'batting') {
@@ -222,28 +222,25 @@ export function parseScorecard(html, { ballsPerOver = 6 } = {}) {
   }
   // "Did not bat: A, B, C" often sits outside the table, as a plain paragraph
   const looseDnb = [];
-  const bodyText = pageText($);
+  const bodyText = pageText(doc);
   for (const m of bodyText.matchAll(/(?:did not bat|yet to bat)\s*:?\s*([^\n]+)/gi)) looseDnb.push(...splitNames(m[1]));
   // short text labels (team headers, innings headers, links) for the exact team-name check
   const labels = new Set();
-  $('body *').each((_, el) => {
-    if ($(el).children().length > 2) return;
-    const t = txt($(el).text());
+  for (const el of (doc.body || doc.documentElement).querySelectorAll('*')) {
+    if (el.children.length > 2) continue;
+    const t = txt(el.textContent);
     if (t && t.length <= 80) labels.add(t);
-  });
-  return { battingCards, bowlingCards, looseDnb, labels: [...labels], meta: parseMeta($, bodyText) };
+  }
+  return { battingCards, bowlingCards, looseDnb, labels: [...labels], meta: parseMeta(doc, bodyText) };
 }
 
-function pageText($) {
-  const html = ($('body').html() || $.html())
+function pageText(doc) {
+  const html = (doc.body || doc.documentElement).innerHTML
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(div|p|li|tr|h\d|table|section|ul|ol)>/gi, '\n')
-    .replace(/<\/t[dh]>/gi, ' ')
+    .replace(/<\/(div|p|li|tr|h\d|table|section|ul|ol)>/gi, '\n$&')
+    .replace(/<\/t[dh]>/gi, ' $&')
     .replace(/<\/(span|a|b|strong|em|i|small|label)>/gi, ' $&');
-  return cheerio
-    .load(html)
-    .root()
-    .text()
+  return htmlText(doc, html)
     .split('\n')
     .map(txt)
     .filter(Boolean)
@@ -252,12 +249,10 @@ function pageText($) {
 
 const MONTHS = 'jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec';
 
-export function parseMeta($, bodyText) {
-  const title = txt($('title').text());
-  const headings = $('h1,h2,h3,h4')
-    .map((_, h) => txt($(h).text()))
-    .get()
-    .filter(Boolean);
+export function parseMeta(doc, bodyText) {
+  const titleEl = doc.querySelector('title');
+  const title = txt(titleEl && titleEl.textContent);
+  const headings = [...doc.querySelectorAll('h1,h2,h3,h4')].map((h) => txt(h.textContent)).filter(Boolean);
   const vsSource = [title, ...headings, ...bodyText.split('\n').slice(0, 80)].find((s) => /\s(vs?\.?|versus)\s/i.test(s)) || '';
   let teams = [];
   const vs = vsSource.match(/(.+?)\s+(?:vs?\.?|versus)\s+(.+)/i);

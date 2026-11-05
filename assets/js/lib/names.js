@@ -8,7 +8,7 @@
 
 export function cleanName(raw = '') {
   return String(raw)
-    .replace(/ /g, ' ')
+    .replace(/\u00a0/g, ' ')
     .replace(/\([^)]*\)/g, ' ') // (c) (wk) (vc)
     .replace(/[*†‡]/g, ' ')
     .replace(/\s+/g, ' ')

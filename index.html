@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>True Blue Falcons · Season Stats</title>
-  <meta name="description" content="Season statistics for True Blue Falcons cricket club: matches played, balls faced, overs bowled and fair-share tracking across Lakeshore and Mississauga Cricket League.">
+  <meta name="description" content="True Blue Falcons season statistics: top run scorers, wicket takers, batting and bowling across Lakeshore and the Mississauga Cricket League.">
   <meta name="theme-color" content="#0a1b3f">
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,14 +12,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
+<body data-mode="public">
   <header class="hero">
     <div class="wrap hero-inner">
       <img class="crest" id="crest" src="assets/logo.svg" alt="True Blue Falcons crest" width="88" height="103">
       <div>
         <p class="eyebrow" id="eyebrow">Season</p>
         <h1>True Blue <span>Falcons</span></h1>
-        <p class="sub">Who has batted, who has bowled, and who is due a game, so the workload is shared fairly across the squad.</p>
+        <p class="sub">Season stats: who's scoring the runs and who's taking the wickets.</p>
       </div>
     </div>
     <div class="wrap kpis" id="kpis" aria-live="polite"></div>
@@ -28,39 +28,33 @@
   <div class="toolbar">
     <div class="wrap">
       <nav class="sections" aria-label="Sections">
-        <a href="#squad">Squad quota</a>
+        <a href="#leaderboard">Leaders</a>
         <a href="#batting">Batting</a>
         <a href="#bowling">Bowling</a>
-        <a href="#workload">Workload</a>
         <a href="#matches">Matches</a>
       </nav>
       <div class="filters">
         <div class="seg" id="tournament-filter" role="group" aria-label="Tournament"></div>
-        <label class="switch" title="Players who pay per match are hidden by default">
-          <input type="checkbox" id="show-none"> Per-match players
-        </label>
-        <a class="btn add-btn" href="add.html">+ Add match</a>
       </div>
     </div>
   </div>
 
   <main class="wrap">
-    <section id="squad">
+    <section id="leaderboard">
       <div class="sec-head">
         <div>
-          <h2>Squad quota</h2>
-          <p>Full members can play up to <b id="cap-full">16</b> matches and half members up to <b id="cap-half">8</b>, out of <b id="total-matches">24</b> across both tournaments. The tick on each bar shows where a player should be by now. These counts cover the whole season, whichever tournament is selected.</p>
+          <h2>Leaders</h2>
+          <p>The top three in each category for the selected tournament.</p>
         </div>
       </div>
-      <div id="planner"></div>
-      <div class="quota-grid" id="quota"></div>
+      <div class="leaders" id="leaders"></div>
     </section>
 
     <section id="batting">
       <div class="sec-head">
         <div>
           <h2>Batting</h2>
-          <p><b>Opp</b> is the number of times a player batted. <b>Opp %</b> is their share of matches played in which they got to bat. Click any column to sort.</p>
+          <p>Everyone who has played this season. Click a column to sort. <b>*</b> means not out.</p>
         </div>
       </div>
       <div class="card table-wrap" id="batting-table"></div>
@@ -70,31 +64,17 @@
       <div class="sec-head">
         <div>
           <h2>Bowling</h2>
-          <p><b>Opp</b> is the number of matches a player bowled in. <b>Balls/M</b> is the average number of balls bowled per match played.</p>
+          <p>Economy is runs per over. Average is runs per wicket.</p>
         </div>
       </div>
       <div class="card table-wrap" id="bowling-table"></div>
-    </section>
-
-    <section id="workload">
-      <div class="sec-head">
-        <div>
-          <h2>Workload</h2>
-          <p>Balls faced (left) and balls bowled (right) per match played. A fair split means everyone gets a similar amount of cricket for their fee.</p>
-        </div>
-        <div class="seg" id="workload-mode" role="group" aria-label="Workload measure">
-          <button type="button" data-mode="per" aria-pressed="true">Per match</button>
-          <button type="button" data-mode="total" aria-pressed="false">Season total</button>
-        </div>
-      </div>
-      <div class="card workload" id="workload-chart"></div>
     </section>
 
     <section id="matches">
       <div class="sec-head">
         <div>
           <h2>Matches</h2>
-          <p>Every match we have parsed, newest first.</p>
+          <p>Newest first.</p>
         </div>
       </div>
       <div class="match-list" id="match-list"></div>
@@ -104,7 +84,7 @@
   <footer>
     <div class="wrap">
       <span id="updated">Loading…</span>
-      <span>Data from <a href="https://cricclubs.com" rel="noopener">CricClubs</a> · <a href="add.html">Add a match</a></span>
+      <span>Data from <a href="https://cricclubs.com" rel="noopener">CricClubs</a> · <a href="admin/">Admin</a></span>
     </div>
   </footer>
 

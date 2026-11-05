@@ -7,10 +7,13 @@
     "ingest": "node scripts/ingest.mjs",
     "build-season": "node scripts/build-season.mjs",
     "serve": "node scripts/serve.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "set-admin-password": "node scripts/set-admin-password.mjs"
   },
   "dependencies": {
-    "cheerio": "1.0.0"
+    "linkedom": "^0.18.5"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }

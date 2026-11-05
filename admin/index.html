@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TBF Admin · Season Stats</title>
+  <meta name="robots" content="noindex">
+  <meta name="description" content="Season statistics for True Blue Falcons cricket club: matches played, balls faced, overs bowled and fair-share tracking across Lakeshore and Mississauga Cricket League.">
+  <meta name="theme-color" content="#0a1b3f">
+  <link rel="icon" href="../assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-mode="admin" data-base="../" class="locked">
+  <div class="lock" id="lock">
+    <form class="card lock-card" id="lock-form">
+      <img src="../assets/logo.svg" alt="" width="56" height="65">
+      <h2>TBF admin</h2>
+      <p class="muted">Enter the admin password.</p>
+      <div class="field">
+        <label for="pw" class="sr-only">Password</label>
+        <input id="pw" type="password" autocomplete="current-password" required autofocus placeholder="Password">
+      </div>
+      <button class="btn" type="submit" id="unlock">Unlock</button>
+      <div class="msg" id="lock-msg" role="status" aria-live="polite"></div>
+      <p class="muted" style="font-size:13px;margin:14px 0 0"><a href="../">← Public stats</a></p>
+    </form>
+  </div>
+
+  <header class="hero">
+    <div class="wrap hero-inner">
+      <img class="crest" id="crest" src="../assets/logo.svg" alt="True Blue Falcons crest" width="88" height="103">
+      <div>
+        <p class="eyebrow"><span id="eyebrow">Season</span> · Admin</p>
+        <h1>True Blue <span>Falcons</span></h1>
+        <p class="sub">Add matches, and see who has batted, who has bowled and who is due a game, so the workload is shared fairly across the squad.</p>
+      </div>
+    </div>
+    <div class="wrap kpis" id="kpis" aria-live="polite"></div>
+  </header>
+
+  <div class="toolbar">
+    <div class="wrap">
+      <nav class="sections" aria-label="Sections">
+        <a href="#add">Add match</a>
+        <a href="#squad">Squad quota</a>
+        <a href="#batting">Batting</a>
+        <a href="#bowling">Bowling</a>
+        <a href="#workload">Workload</a>
+        <a href="#matches">Matches</a>
+      </nav>
+      <div class="filters">
+        <div class="seg" id="tournament-filter" role="group" aria-label="Tournament"></div>
+        <label class="switch" title="Players who pay per match are hidden by default">
+          <input type="checkbox" id="show-none"> Per-match players
+        </label>
+        <button class="btn ghost add-btn" type="button" id="lock-again">Lock</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <section id="add">
+      <div class="sec-head">
+        <div>
+          <h2>Add a match</h2>
+          <p>Paste the CricClubs <b>full scorecard</b> link. Check the stats, then save. The public page updates about a minute later.</p>
+        </div>
+      </div>
+      <div class="add-grid">
+        <div class="card add-card">
+          <ol class="steps">
+            <li>
+              <div class="field" style="margin-top:0">
+                <label for="url">CricClubs full scorecard link</label>
+                <div class="inline">
+                  <input id="url" type="url" autocomplete="off" spellcheck="false" placeholder="https://www.cricclubs.com/MississaugaCricketLeague/fullScorecard.do?matchId=8556&amp;clubId=2565">
+                  <button class="btn" type="button" id="open">Open scorecard</button>
+                </div>
+              </div>
+            </li>
+            <li>On the CricClubs tab that opens, wait for the scorecard to load, then click your <b>Send to TBF</b> bookmark. The stats appear below.</li>
+          </ol>
+          <div class="msg" id="add-msg" role="status" aria-live="polite"></div>
+          <div id="preview"></div>
+        </div>
+        <div class="card add-card side">
+          <h3>Send to TBF bookmark</h3>
+          <p class="muted small">One-time setup: drag this button to your bookmarks bar.</p>
+          <p><a class="btn bm" id="bookmarklet" href="#" title="Drag me to your bookmarks bar">★ Send to TBF</a></p>
+          <p class="muted small">CricClubs blocks websites and bots from downloading scorecards, so the scorecard has to come from your own browser tab. The bookmark sends it back here.</p>
+          <details>
+            <summary>No bookmarks bar? (phone)</summary>
+            <p class="muted small">Save the scorecard page (<b>Cmd+S</b> / <b>Ctrl+S</b>) and choose the file here:</p>
+            <input type="file" id="file" accept=".html,.htm,text/html">
+            <p class="muted small">If the bookmark says it copied the page instead, paste it here:</p>
+            <button class="btn ghost" type="button" id="paste">Paste from clipboard</button>
+          </details>
+          <h3 style="margin-top:18px">Saving</h3>
+          <p class="muted small" id="save-status">Checking…</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="squad">
+      <div class="sec-head">
+        <div>
+          <h2>Squad quota</h2>
+          <p>Full members can play up to <b id="cap-full">16</b> matches and half members up to <b id="cap-half">8</b>, out of <b id="total-matches">24</b> across both tournaments. The tick on each bar shows where a player should be by now. These counts cover the whole season, whichever tournament is selected.</p>
+        </div>
+      </div>
+      <div id="planner"></div>
+      <div class="quota-grid" id="quota"></div>
+    </section>
+
+    <section id="batting">
+      <div class="sec-head">
+        <div>
+          <h2>Batting</h2>
+          <p><b>Opp</b> is the number of times a player batted. <b>Opp %</b> is their share of matches played in which they got to bat. Click any column to sort.</p>
+        </div>
+      </div>
+      <div class="card table-wrap" id="batting-table"></div>
+    </section>
+
+    <section id="bowling">
+      <div class="sec-head">
+        <div>
+          <h2>Bowling</h2>
+          <p><b>Opp</b> is the number of matches a player bowled in. <b>Balls/M</b> is the average number of balls bowled per match played.</p>
+        </div>
+      </div>
+      <div class="card table-wrap" id="bowling-table"></div>
+    </section>
+
+    <section id="workload">
+      <div class="sec-head">
+        <div>
+          <h2>Workload</h2>
+          <p>Balls faced (left) and balls bowled (right) per match played. A fair split means everyone gets a similar amount of cricket for their fee.</p>
+        </div>
+        <div class="seg" id="workload-mode" role="group" aria-label="Workload measure">
+          <button type="button" data-mode="per" aria-pressed="true">Per match</button>
+          <button type="button" data-mode="total" aria-pressed="false">Season total</button>
+        </div>
+      </div>
+      <div class="card workload" id="workload-chart"></div>
+    </section>
+
+    <section id="matches">
+      <div class="sec-head">
+        <div>
+          <h2>Matches</h2>
+          <p>Every match we have parsed, newest first.</p>
+        </div>
+      </div>
+      <div class="match-list" id="match-list"></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span id="updated">Loading…</span>
+      <span>Data from <a href="https://cricclubs.com" rel="noopener">CricClubs</a> · <a href="../">Public stats</a></span>
+    </div>
+  </footer>
+
+  <script src="../assets/js/stats.js"></script>
+  <script src="../assets/js/app.js"></script>
+  <script type="module" src="../assets/js/admin.js"></script>
+</body>
+</html>

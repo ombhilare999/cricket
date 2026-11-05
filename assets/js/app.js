@@ -1,11 +1,18 @@
 (function () {
   'use strict';
+  // Runs two pages: the public stats page (data-mode="public": leaderboards only) and the
+  // admin page (data-mode="admin": quotas, opportunities and workload as well).
   const S = window.TBFStats;
+  const MODE = document.body.dataset.mode === 'public' ? 'public' : 'admin';
+  const ADMIN = MODE === 'admin';
+  const BASE = document.body.dataset.base || '';
   const state = {
     tournament: 'all',
     showNone: false,
     workload: 'per',
-    sort: { batting: { key: 'balls', dir: -1 }, bowling: { key: 'balls', dir: -1 } },
+    sort: ADMIN
+      ? { batting: { key: 'balls', dir: -1 }, bowling: { key: 'balls', dir: -1 } }
+      : { batting: { key: 'runs', dir: -1 }, bowling: { key: 'wkts', dir: -1 } },
   };
   let config, players, season;
 
@@ -16,7 +23,7 @@
   const short = (p) => p.first.split(' ')[0] + ' ' + p.last;
   const fixed = (v, d) => (v == null || !isFinite(v) ? '–' : v.toFixed(d));
   const tierRank = (p) => (config.tiers[p.tier] ? config.tiers[p.tier].priority : 9);
-  const badge = (p) => '<span class="badge ' + p.tier + '">' + (p.tier === 'none' ? 'Per match' : p.tier) + '</span>';
+  const badge = (p) => !ADMIN ? '' : '<span class="badge ' + p.tier + '">' + (p.tier === 'none' ? 'Per match' : p.tier) + '</span>';
   const tName = (id) => (config.tournaments.find((t) => t.id === id) || { short: id }).short;
 
   function store(k, v) { try { localStorage.setItem('tbf.' + k, JSON.stringify(v)); } catch (e) { /* private mode */ } }
@@ -31,22 +38,24 @@
   // ---------------------------------------------------------------- boot
   async function boot() {
     try {
-      [config, { players }, season] = await Promise.all([load('data/config.json'), load('data/players.json'), load('data/season.json')]);
+      [config, { players }, season] = await Promise.all([load(BASE + 'data/config.json'), load(BASE + 'data/players.json'), load(BASE + 'data/season.json')]);
     } catch (e) {
       document.querySelector('main').innerHTML = '<div class="card empty"><strong>Could not load data</strong>' + esc(e.message) + '</div>';
       return;
     }
-    if (config.logo) $('crest').src = config.logo;
+    if (config.logo) $('crest').src = BASE + config.logo;
     $('eyebrow').textContent = 'Season ' + config.season + ' · ' + config.tournaments.map((t) => t.name).join(' & ');
-    $('cap-full').textContent = config.tiers.full.cap;
-    $('cap-half').textContent = config.tiers.half.cap;
-    $('total-matches').textContent = config.totalMatches;
-    $('updated').textContent = season.generatedAt ? 'Updated ' + new Date(season.generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'No matches parsed yet';
+    if (ADMIN) {
+      $('cap-full').textContent = config.tiers.full.cap;
+      $('cap-half').textContent = config.tiers.half.cap;
+      $('total-matches').textContent = config.totalMatches;
+    }
+    renderUpdated();
 
     state.showNone = recall('showNone', false);
     state.tournament = recall('tournament', 'all');
     if (state.tournament !== 'all' && !config.tournaments.some((t) => t.id === state.tournament)) state.tournament = 'all';
-    $('show-none').checked = state.showNone;
+    if ($('show-none')) $('show-none').checked = state.showNone;
 
     const seg = $('tournament-filter');
     seg.innerHTML = [{ id: 'all', short: 'All' }].concat(config.tournaments).map((t) =>
@@ -58,8 +67,8 @@
       store('tournament', state.tournament);
       render();
     });
-    $('show-none').addEventListener('change', (e) => { state.showNone = e.target.checked; store('showNone', state.showNone); render(); });
-    $('workload-mode').addEventListener('click', (e) => {
+    if ($('show-none')) $('show-none').addEventListener('change', (e) => { state.showNone = e.target.checked; store('showNone', state.showNone); render(); });
+    if ($('workload-mode')) $('workload-mode').addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
       state.workload = b.dataset.mode;
@@ -70,7 +79,23 @@
     render();
   }
 
+  function renderUpdated() {
+    $('updated').textContent = season.generatedAt ? 'Updated ' + new Date(season.generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'No matches yet';
+  }
+
+  // the admin page calls this after saving a match, so the new stats show at once
+  window.TBFApp = {
+    setData(next) {
+      if (next.season) season = next.season;
+      if (next.players) players = next.players;
+      renderUpdated();
+      render();
+    },
+    get data() { return { config, players, season }; },
+  };
+
   function visible(L) {
+    if (!ADMIN) return L.matches > 0;
     if (L.player.tier === 'none') return state.showNone && L.matches > 0;
     return true;
   }
@@ -79,11 +104,15 @@
     [...$('tournament-filter').children].forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === state.tournament)));
     const agg = S.aggregate(season, players, state.tournament);
     renderKpis(agg);
-    renderPlanner();
-    renderQuota(agg);
+    if (ADMIN) {
+      renderPlanner();
+      renderQuota(agg);
+    } else {
+      renderLeaders(agg);
+    }
     renderBatting(agg);
     renderBowling(agg);
-    renderWorkload(agg);
+    if (ADMIN) renderWorkload(agg);
     renderMatches(agg);
   }
 
@@ -102,6 +131,28 @@
       k(agg.matches.length ? wins + '<small> / ' + agg.matches.length + '</small>' : '–', 'Wins' + (state.tournament === 'all' ? '' : ' · ' + tName(state.tournament))) +
       k(runs, 'Runs off the bat') +
       k(wkts, 'Wickets');
+  }
+
+  // ---------------------------------------------------------------- leaders (public page)
+  function renderLeaders(agg) {
+    const L = [...agg.lines.values()].filter((x) => x.matches > 0);
+    const top = (arr, f, tie) => arr.filter((x) => f(x) > 0).sort((a, b) => f(b) - f(a) || (tie ? tie(a, b) : 0)).slice(0, 3);
+    const bowlKey = (x) => (x.bowl.best ? x.bowl.best.w * 1000 - x.bowl.best.r : 0);
+    const boards = [
+      { title: 'Most runs', icon: 'bat', rows: top(L, (x) => x.bat.runs, (a, b) => a.bat.balls - b.bat.balls), v: (x) => x.bat.runs, sub: (x) => x.bat.inns + ' inns · ' + x.bat.balls + ' balls · SR ' + fixed(x.bat.sr, 0) },
+      { title: 'Most wickets', icon: 'ball', rows: top(L, (x) => x.bowl.wickets, (a, b) => (a.bowl.econ || 99) - (b.bowl.econ || 99)), v: (x) => x.bowl.wickets, sub: (x) => S.fmtOvers(x.bowl.balls, config.ballsPerOver) + ' ov · econ ' + fixed(x.bowl.econ, 2) },
+      { title: 'Highest score', icon: 'star', rows: top(L, (x) => x.bat.hs + (x.bat.hsNotOut ? 0.5 : 0)), v: (x) => x.bat.hs + (x.bat.hsNotOut ? '*' : ''), sub: (x) => x.bat.fours + ' fours · ' + x.bat.sixes + ' sixes this season' },
+      { title: 'Best bowling', icon: 'target', rows: top(L, bowlKey), v: (x) => x.bowl.best.w + '/' + x.bowl.best.r, sub: (x) => x.bowl.inns + ' matches bowled' },
+    ];
+    $('leaders').innerHTML = boards.map((b) => {
+      if (!b.rows.length) return '<div class="card leader empty-leader"><h3>' + b.title + '</h3><p class="muted">No one yet</p></div>';
+      const [first, ...rest] = b.rows;
+      return '<div class="card leader"><h3>' + b.title + '</h3>' +
+        '<div class="lead-top"><div><div class="lead-name">' + esc(fullName(first.player)) + '</div><div class="lead-sub">' + esc(b.sub(first)) + '</div></div>' +
+        '<div class="lead-v num">' + b.v(first) + '</div></div>' +
+        (rest.length ? '<ol class="lead-rest">' + rest.map((x) => '<li><span>' + esc(short(x.player)) + '</span><b class="num">' + b.v(x) + '</b></li>').join('') + '</ol>' : '') +
+        '</div>';
+    }).join('');
   }
 
   // ---------------------------------------------------------------- quota
@@ -160,7 +211,7 @@
       if (typeof va === 'string') return sort.dir * va.localeCompare(vb);
       return sort.dir * ((va == null ? -Infinity : va) - (vb == null ? -Infinity : vb)) || tierRank(a.player) - tierRank(b.player);
     });
-    if (!rows.length) return '<div class="empty"><strong>No players to show</strong>Turn on per-match players or parse a match.</div>';
+    if (!rows.length) return '<div class="empty"><strong>No players to show</strong>' + (ADMIN ? 'Turn on per-match players or add a match.' : 'Stats appear here once the first match is added.') + '</div>';
     const head = '<thead><tr>' + cols.map((c) =>
       '<th scope="col" data-key="' + c.key + '"' + (c.key === sort.key ? ' aria-sort="' + (sort.dir < 0 ? 'descending' : 'ascending') + '"' : '') + ' title="' + esc(c.title || c.label) + '">' + c.label + '</th>').join('') + '</tr></thead>';
     const body = '<tbody>' + rows.map((r) => '<tr>' + cols.map((c) => {
@@ -188,7 +239,19 @@
   function renderBatting(agg) {
     const rows = [...agg.lines.values()].filter(visible);
     const maxBalls = Math.max(1, ...rows.map((L) => L.bat.balls));
-    const cols = [
+    const maxRuns = Math.max(1, ...rows.map((L) => L.bat.runs));
+    const cols = !ADMIN ? [
+      nameCol, mCol,
+      { key: 'inns', label: 'Inns', title: 'Innings batted', val: (L) => L.bat.inns },
+      { key: 'runs', label: 'Runs', val: (L) => L.bat.runs, render: (L) => '<span class="cellbar"><i style="width:' + Math.round((L.bat.runs * 60) / maxRuns) + 'px"></i>' + L.bat.runs + '</span>' },
+      { key: 'balls', label: 'Balls', title: 'Balls faced', val: (L) => L.bat.balls },
+      { key: 'hs', label: 'HS', title: 'Highest score', val: (L) => L.bat.hs, render: (L) => (L.bat.inns ? L.bat.hs + (L.bat.hsNotOut ? '*' : '') : '–') },
+      { key: 'avg', label: 'Avg', val: (L) => L.bat.avg, render: (L) => fixed(L.bat.avg, 1) },
+      { key: 'sr', label: 'SR', title: 'Strike rate', val: (L) => L.bat.sr, render: (L) => fixed(L.bat.sr, 1) },
+      { key: 'b4', label: '4s', val: (L) => L.bat.fours },
+      { key: 'b6', label: '6s', val: (L) => L.bat.sixes },
+      { key: 'f50', label: '50s', val: (L) => L.bat.fifties },
+    ] : [
       nameCol, mCol,
       { key: 'inns', label: 'Opp', title: 'Batting opportunities (innings batted)', val: (L) => L.bat.inns },
       { key: 'opp', label: 'Opp %', title: 'Batted in this % of matches played', val: (L) => L.bat.oppPct, render: (L) => (L.bat.oppPct == null ? '–' : Math.round(L.bat.oppPct) + '%') },
@@ -212,7 +275,17 @@
     const bpo = config.ballsPerOver;
     const rows = [...agg.lines.values()].filter(visible);
     const maxBalls = Math.max(1, ...rows.map((L) => L.bowl.balls));
-    const cols = [
+    const maxWkts = Math.max(1, ...rows.map((L) => L.bowl.wickets));
+    const cols = !ADMIN ? [
+      nameCol, mCol,
+      { key: 'overs', label: 'Overs', val: (L) => L.bowl.balls, render: (L) => (L.bowl.balls ? S.fmtOvers(L.bowl.balls, bpo) : '–') },
+      { key: 'wkts', label: 'Wkts', val: (L) => L.bowl.wickets, render: (L) => '<span class="cellbar bowl"><i style="width:' + Math.round((L.bowl.wickets * 60) / maxWkts) + 'px"></i>' + L.bowl.wickets + '</span>' },
+      { key: 'runs', label: 'Runs', title: 'Runs conceded', val: (L) => L.bowl.runs },
+      { key: 'econ', label: 'Econ', val: (L) => (L.bowl.econ == null ? null : -L.bowl.econ), render: (L) => fixed(L.bowl.econ, 2), title: 'Economy (sorts best first)' },
+      { key: 'avg', label: 'Avg', val: (L) => (L.bowl.avg == null ? null : -L.bowl.avg), render: (L) => fixed(L.bowl.avg, 1), title: 'Bowling average (sorts best first)' },
+      { key: 'best', label: 'Best', val: (L) => (L.bowl.best ? L.bowl.best.w * 1000 - L.bowl.best.r : null), render: (L) => (L.bowl.best ? L.bowl.best.w + '/' + L.bowl.best.r : '–') },
+      { key: 'mdn', label: 'Mdns', title: 'Maidens', val: (L) => L.bowl.maidens },
+    ] : [
       nameCol, mCol,
       { key: 'inns', label: 'Opp', title: 'Bowling opportunities (matches bowled in)', val: (L) => L.bowl.inns },
       { key: 'opp', label: 'Opp %', title: 'Bowled in this % of matches played', val: (L) => L.bowl.oppPct, render: (L) => (L.bowl.oppPct == null ? '–' : Math.round(L.bowl.oppPct) + '%') },
@@ -260,7 +333,7 @@
   function renderMatches(agg) {
     const list = agg.matches.slice().reverse();
     if (!list.length) {
-      $('match-list').innerHTML = '<div class="card empty" style="grid-column:1/-1"><strong>No matches yet</strong>Anyone can add a match from its CricClubs full scorecard. <a href="add.html">Add the first one</a>.</div>';
+      $('match-list').innerHTML = '<div class="card empty" style="grid-column:1/-1"><strong>No matches yet</strong>' + (ADMIN ? 'Add the first one with the form above.' : 'Matches appear here as they are added.') + '</div>';
       return;
     }
     const byId = new Map(players.map((p) => [p.id, p]));
@@ -291,7 +364,7 @@
   // ---------------------------------------------------------------- nav highlight
   function spyOnSections() {
     const links = [...document.querySelectorAll('.sections a')];
-    if (!('IntersectionObserver' in window)) return;
+    if (!links.length || !('IntersectionObserver' in window)) return;
     const io = new IntersectionObserver((entries) => {
       entries.forEach((en) => {
         if (en.isIntersecting) links.forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#' + en.target.id));

@@ -2,13 +2,15 @@
 // Add one match from its CricClubs full scorecard.
 //
 //   node scripts/ingest.mjs --url "https://cricclubs.com/<League>/fullScorecard.do?clubId=..&matchId=.."
-//   node scripts/ingest.mjs --from-text "$ISSUE_BODY"      # finds the link inside free text
+//
+// Normally matches are added from the admin page (/cricket/admin/). CricClubs blocks most
+// automated downloads, so from the command line pass a page saved from your browser.
 //
 // Options:
 //   --tournament auto|lakeshore|mcl   default: detect from the league in the link
 //   --scorecard-html file.html        use a saved page instead of downloading
 //   --reparse                         re-read the raw page saved in data/raw/ (CLI only)
-//   --result file.md                  write a human-readable result (used for issue comments)
+//   --result file.md                  write a human-readable result
 //
 // Exit codes: 0 added, 2 rejected (bad link, wrong team, unknown players), 3 already added,
 // 4 download/parse failure.
@@ -17,7 +19,9 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { parseMatchUrl, detectTournament, buildMatch, findScorecardLink, RejectedMatch } from './lib/match.mjs';
+import { parseMatchUrl, detectTournament, buildMatch, RejectedMatch } from '../assets/js/lib/match.js';
+import { slimHtml as slim } from '../assets/js/lib/season.js';
+import { htmlToDoc } from './lib/dom.mjs';
 import { buildSeason } from './build-season.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,7 +30,6 @@ const readJson = (p) => JSON.parse(readFileSync(join(ROOT, p), 'utf8'));
 const { values: args } = parseArgs({
   options: {
     url: { type: 'string' },
-    'from-text': { type: 'string' },
     tournament: { type: 'string', default: 'auto' },
     'scorecard-html': { type: 'string' },
     reparse: { type: 'boolean', default: false },
@@ -59,17 +62,8 @@ async function download(url) {
   return res.text();
 }
 
-// keep raw pages small: drop scripts, styles, svg and comments
-const slim = (html) =>
-  html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/\n\s*\n+/g, '\n');
-
 async function main() {
-  const link = args.url || findScorecardLink(args['from-text']);
+  const link = args.url;
   if (!link) fail(2, 'No CricClubs full scorecard link found. It should look like https://cricclubs.com/MississaugaCricketLeague/fullScorecard.do?clubId=2565&matchId=8556');
 
   let info;
@@ -104,7 +98,7 @@ async function main() {
 
   let parsed;
   try {
-    parsed = buildMatch({ scorecardHtml: html, players, config });
+    parsed = buildMatch({ doc: htmlToDoc(html), players, config });
   } catch (e) {
     if (e instanceof RejectedMatch) fail(2, e.message);
     fail(4, `Could not read the scorecard: ${e.message}`);

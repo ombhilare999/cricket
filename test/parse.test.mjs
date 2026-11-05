@@ -1,9 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildMatcher } from '../scripts/lib/names.mjs';
-import { parseMatchUrl, buildMatch, detectTournament, findScorecardLink, RejectedMatch } from '../scripts/lib/match.mjs';
-import { oversToBalls } from '../scripts/lib/parse.mjs';
+import { buildMatcher } from '../assets/js/lib/names.js';
+import { parseMatchUrl, buildMatch as build, detectTournament, findScorecardLink, RejectedMatch } from '../assets/js/lib/match.js';
+import { oversToBalls } from '../assets/js/lib/parse.js';
+import { buildSeason } from '../assets/js/lib/season.js';
+import { htmlToDoc } from '../scripts/lib/dom.mjs';
+
+const buildMatch = ({ scorecardHtml, ...rest }) => build({ doc: htmlToDoc(scorecardHtml), ...rest });
 
 const fixture = readFileSync(new URL('./fixtures/scorecard.html', import.meta.url), 'utf8');
 const { players } = JSON.parse(readFileSync(new URL('../data/players.json', import.meta.url), 'utf8'));
@@ -28,6 +32,9 @@ test('only full scorecard links are accepted', () => {
   assert.equal(u.scorecardUrl, 'https://cricclubs.com/MississaugaCricketLeague/fullScorecard.do?clubId=2565&matchId=8556');
   assert.equal(detectTournament(u.league, config), 'mcl');
   assert.equal(detectTournament('LakeshoreCricketLeague', config), 'lakeshore');
+  const www = parseMatchUrl('https://www.cricclubs.com/MississaugaCricketLeague/fullScorecard.do?matchId=8556&clubId=2565');
+  assert.equal(www.id, 'mississaugacricketleague-8556', 'www. and either parameter order are fine');
+  assert.equal(www.scorecardUrl, u.scorecardUrl);
   assert.throws(() => parseMatchUrl('https://cricclubs.com/MississaugaCricketLeague/ballbyball.do?clubId=2565&matchId=8556'), RejectedMatch);
   assert.throws(() => parseMatchUrl('https://evil.com/X/fullScorecard.do?matchId=1'), RejectedMatch);
   assert.throws(() => parseMatchUrl('https://cricclubs.com/X/fullScorecard.do?clubId=1'), RejectedMatch);
@@ -62,7 +69,18 @@ test('scorecard: picks our cards, reads stats, DNB and meta', () => {
 
 test('rejects a scorecard with a player not on the roster', () => {
   const html = fixture.replace('>Aditya Peri<', '>Some Guest<');
-  assert.throws(() => buildMatch({ scorecardHtml: html, players, config }), (e) => e instanceof RejectedMatch && /Some Guest/.test(e.message));
+  assert.throws(() => buildMatch({ scorecardHtml: html, players, config }), (e) => e instanceof RejectedMatch && /Some Guest/.test(e.message) && e.unknown.includes('Some Guest'));
+  const withAlias = players.map((p) => (p.id === 'aditya-peri' ? { ...p, aliases: ['Some Guest'] } : p));
+  const m = buildMatch({ scorecardHtml: html, players: withAlias, config });
+  assert.ok(m.players.some((p) => p.playerId === 'aditya-peri'), 'an alias fixes it');
+});
+
+test('season build resolves ids and adds extra players', () => {
+  const m = { id: 'x-1', date: '2026-06-14', ...buildMatch({ scorecardHtml: fixture, players, config }), extraPlayers: ['ali-naqvi'] };
+  const s = buildSeason([m], players);
+  assert.equal(s.matches[0].players.length, 12);
+  assert.deepEqual(s.unmatchedNames, []);
+  assert.equal(buildSeason(s.matches, players).matches[0].players.length, 12, 'rebuilding is idempotent');
 });
 
 test('rejects a scorecard with a near-miss name', () => {
