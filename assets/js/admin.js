@@ -1,12 +1,14 @@
 // Admin page: password lock, and adding a match straight to the repo.
 //
-// Flow: paste a CricClubs full-scorecard link → "Open scorecard" opens it in a new tab →
-// the "Send to TBF" bookmarklet posts that tab's HTML back here (CricClubs blocks
-// automated downloads, so it must come from the admin's own browser) → the same parser
-// the tests use reads it → preview → "Save" commits the match, the rebuilt season and any
-// roster changes to GitHub in one commit. The push redeploys the site.
+// Main flow: save the CricClubs "Score Card PDF" page as a PDF and drop it here. pdf.js
+// reads it in the browser (lib/pdf.js), the match link printed in its footer identifies the
+// match, and the same rules as the tests run → preview → "Save" commits the match, the
+// rebuilt season, the PDF and any roster changes to GitHub in one commit. The push redeploys.
+// CricClubs blocks automated downloads, so the scorecard always comes from the admin's own
+// browser. Other ways in: the "Send to TBF" bookmarklet, or a saved HTML page.
 
-import { parseMatchUrl, detectTournament, buildMatch, RejectedMatch } from './lib/match.js';
+import { parseMatchUrl, detectTournament, buildMatch, buildMatchFromScorecard, RejectedMatch } from './lib/match.js';
+import { readPdfLines, parsePdfScorecard } from './lib/pdf.js';
 import { buildSeason, slimHtml } from './lib/season.js';
 import { seal, unseal } from './lib/vault.js';
 
@@ -139,7 +141,7 @@ async function connect() {
 const BOOKMARKLET = `(function(){
 var h='<!doctype html>'+document.documentElement.outerHTML.replace(/<script[\\s\\S]*?<\\/script>/gi,'');
 var d={type:'tbf-scorecard',url:location.href,html:h};
-if(!/fullScorecard/i.test(location.href)){alert('Open the CricClubs Full Scorecard page first.');return;}
+if(!/fullScorecard|scoreCardPdf/i.test(location.href)){alert('Open the CricClubs scorecard page first.');return;}
 if(window.opener&&!window.opener.closed){window.opener.postMessage(d,'*');alert('Sent to TBF admin. You can close this tab.');return;}
 navigator.clipboard.writeText(JSON.stringify(d)).then(function(){alert('Copied. Go back to the TBF admin page and press Paste from clipboard.');},function(){alert('Could not send the scorecard. Save the page (Cmd+S) and upload it on the admin page.');});
 })();`;
@@ -164,21 +166,53 @@ $('open').addEventListener('click', () => {
   if (!raw) return msg('add-msg', 'warn', 'Paste the full scorecard link first.');
   let info;
   try { info = parseMatchUrl(raw); } catch (err) { return msg('add-msg', 'warn', esc(err.message)); }
+  const pdfUrl = 'https://www.cricclubs.com/' + info.league + '/scoreCardPdf.do?matchId=' + info.matchId + (info.clubId ? '&clubId=' + info.clubId : '');
   // no "noopener": the bookmarklet needs window.opener to send the page back
-  const w = window.open(raw, 'tbf-scorecard');
-  msg('add-msg', '', w
-    ? 'Opened match ' + esc(info.matchId) + ' in a new tab. Once the scorecard shows, click <b>Send to TBF</b> in your bookmarks bar.'
-    : 'Your browser blocked the new tab. <a href="' + esc(raw) + '" target="tbf-scorecard">Open the scorecard</a>, then click <b>Send to TBF</b>.');
+  const w = window.open(pdfUrl, 'tbf-scorecard');
+  msg('add-msg', '', (w ? 'Opened the scorecard PDF page for match ' + esc(info.matchId) + ' in a new tab.' : 'Your browser blocked the new tab. <a href="' + esc(pdfUrl) + '" target="tbf-scorecard">Open the scorecard PDF page</a>.') +
+    ' Save it as a PDF (<b>Cmd+P</b> / <b>Ctrl+P</b> → <b>Save as PDF</b>), then drop the file here.');
 });
 
-$('file').addEventListener('change', async (e) => {
-  const f = e.target.files[0];
+// ------------------------------------------------------------------ files (PDF or saved HTML)
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/';
+let pdfjsLib = null;
+async function pdfjs() {
+  if (!pdfjsLib) {
+    pdfjsLib = await import(PDFJS + 'pdf.min.mjs');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.mjs';
+  }
+  return pdfjsLib;
+}
+
+async function receiveFile(f) {
   if (!f) return;
-  const html = await f.text();
-  const saved = (html.match(/<!-- saved from url=\(\d+\)(\S+) -->/) || [])[1];
-  receive($('url').value.trim() || saved, html);
-  e.target.value = '';
-});
+  if (!session) return;
+  const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+  if (!isPdf) {
+    const html = await f.text();
+    const saved = (html.match(/<!-- saved from url=\(\d+\)(\S+) -->/) || [])[1];
+    return receive($('url').value.trim() || saved, html);
+  }
+  msg('add-msg', '', 'Reading ' + esc(f.name) + '…');
+  try {
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    const sc = parsePdfScorecard(await readPdfLines(await pdfjs(), bytes.slice()), { ballsPerOver: config.ballsPerOver || 6 });
+    const url = sc.link || $('url').value.trim();
+    if (!url) {
+      return msg('add-msg', 'warn', 'This PDF has no CricClubs link printed at the bottom, so I can’t tell which match it is. Paste the match link in the box above and drop the PDF again. (Tip: keep “Headers and footers” ticked when saving as PDF.)');
+    }
+    receive(url, null, { sc, pdf: bytes });
+  } catch (err) {
+    msg('add-msg', 'warn', '<strong>Could not read that PDF</strong>' + esc(err.message));
+  }
+}
+
+$('file').addEventListener('change', (e) => { receiveFile(e.target.files[0]); e.target.value = ''; });
+$('pdf').addEventListener('change', (e) => { receiveFile(e.target.files[0]); e.target.value = ''; });
+const drop = $('drop');
+['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', (e) => receiveFile(e.dataTransfer.files[0]));
 
 $('paste').addEventListener('click', async () => {
   let text;
@@ -192,13 +226,13 @@ $('paste').addEventListener('click', async () => {
 });
 
 // ------------------------------------------------------------------ parse + preview
-function receive(url, html) {
+function receive(url, html, pdfSource) {
   if (!session) return; // still locked
   if (!url) return msg('add-msg', 'warn', 'Paste the scorecard link in the box first, so the match can be identified.');
   let info;
   try { info = parseMatchUrl(url); } catch (err) { return msg('add-msg', 'warn', esc(err.message)); }
   $('url').value = url;
-  if (/Just a moment|Performing security verification/i.test(html) && !/<table/i.test(html)) {
+  if (html && /Just a moment|Performing security verification/i.test(html) && !/<table/i.test(html)) {
     return msg('add-msg', 'warn', 'That tab was still on the CricClubs security check. Wait for the scorecard to show, then click the bookmark again.');
   }
   const tournament = detectTournament(info.league, config);
@@ -208,15 +242,16 @@ function receive(url, html) {
     const m = season.matches.find((x) => x.id === info.id);
     return msg('add-msg', 'warn', '<strong>Already added</strong>Match ' + esc(info.matchId) + ' (vs ' + esc(m.opponent || '?') + ') is already in the stats.');
   }
-  draft = { info, tournament, html, players: JSON.parse(JSON.stringify(players)), rosterChanges: [], extraPlayers: [], date: null };
+  draft = { info, tournament, html, sc: pdfSource && pdfSource.sc, pdf: pdfSource && pdfSource.pdf, players: JSON.parse(JSON.stringify(players)), rosterChanges: [], extraPlayers: [], date: null };
   parseDraft();
 }
 
 function parseDraft() {
   msg('add-msg', '', '');
-  const doc = new DOMParser().parseFromString(draft.html, 'text/html');
   try {
-    draft.parsed = buildMatch({ doc, players: draft.players, config });
+    draft.parsed = draft.sc
+      ? buildMatchFromScorecard(draft.sc, { players: draft.players, config })
+      : buildMatch({ doc: new DOMParser().parseFromString(draft.html, 'text/html'), players: draft.players, config });
     draft.date = draft.date || draft.parsed.date;
     renderPreview();
   } catch (err) {
@@ -302,6 +337,12 @@ function renderPreview() {
 }
 
 // ------------------------------------------------------------------ save
+function toBase64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
 async function save() {
   const btn = $('save');
   btn.disabled = true;
@@ -328,6 +369,7 @@ async function save() {
       scorecardUrl: info.scorecardUrl,
       parsedAt: new Date().toISOString(),
       ...parsed,
+      source: draft.pdf ? 'pdf' : 'scorecard',
       ...(draft.date && draft.date !== parsed.date ? { date: draft.date, dateOverride: draft.date } : {}),
       ...(draft.extraPlayers.length ? { extraPlayers: draft.extraPlayers } : {}),
     };
@@ -340,11 +382,16 @@ async function save() {
     const files = [
       { path, content: JSON.stringify(record, null, 1) + '\n' },
       { path: 'data/season.json', content: JSON.stringify(season, null, 1) + '\n' },
-      { path: 'data/raw/' + info.id + '.scorecard.html', content: slimHtml(draft.html) },
     ];
+    if (draft.pdf) {
+      const blob = await gh('/git/blobs', { method: 'POST', body: { content: toBase64(draft.pdf), encoding: 'base64' } });
+      files.push({ path: 'data/raw/' + info.id + '.scorecard.pdf', sha: blob.sha });
+    } else {
+      files.push({ path: 'data/raw/' + info.id + '.scorecard.html', content: slimHtml(draft.html) });
+    }
     if (draft.rosterChanges.length) files.push({ path: 'data/players.json', content: JSON.stringify(playersFile, null, 2) + '\n' });
 
-    const tree = await gh('/git/trees', { method: 'POST', body: { base_tree: base.tree.sha, tree: files.map((f) => ({ path: f.path, mode: '100644', type: 'blob', content: f.content })) } });
+    const tree = await gh('/git/trees', { method: 'POST', body: { base_tree: base.tree.sha, tree: files.map((f) => ({ path: f.path, mode: '100644', type: 'blob', ...(f.sha ? { sha: f.sha } : { content: f.content }) })) } });
     const t = config.tournaments.find((x) => x.id === tournament);
     const commit = await gh('/git/commits', {
       method: 'POST',

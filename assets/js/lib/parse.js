@@ -123,7 +123,7 @@ function nameAndDismissal(cells, nameIdx, firstStatIdx) {
   for (let i = nameIdx + 1; i < firstStatIdx && i < cells.length; i++) {
     if (cells[i].text && num(cells[i].text) == null) dismissal = txt(`${dismissal} ${cells[i].text}`);
   }
-  return { name: cleanName(name), dismissal, pid: c.pid };
+  return { name: cleanName(name), dismissal, pid: c.pid, starred: /\*/.test(c.text) };
 }
 
 function parseBatting(rows, cls) {
@@ -141,11 +141,12 @@ function parseBatting(rows, cls) {
     }
     if (!first || SKIP_ROW.test(first)) continue;
     if (cells.length <= Math.max(idx.r, idx.b)) continue;
-    const { name, dismissal, pid } = nameAndDismissal(cells, idx.name, Math.min(idx.r, idx.b));
+    const { name, dismissal, pid, starred } = nameAndDismissal(cells, idx.name, Math.min(idx.r, idx.b));
     if (!name || /^\d/.test(name)) continue;
     const runs = num(cells[idx.r]?.text);
     const balls = num(cells[idx.b]?.text);
-    const didNotBat = /did not bat|\bdnb\b/i.test(dismissal) || (runs == null && balls == null);
+    // the PDF scorecard lists everyone; a row with no dismissal, no * (not out) and 0 (0) did not bat
+    const didNotBat = /did not bat|\bdnb\b/i.test(dismissal) || (runs == null && balls == null) || (!dismissal && !starred && !runs && !balls);
     if (didNotBat) {
       dnb.push(name);
       continue;
@@ -160,7 +161,7 @@ function parseBatting(rows, cls) {
       fours: idx.fours >= 0 ? num(cells[idx.fours]?.text) ?? 0 : 0,
       sixes: idx.sixes >= 0 ? num(cells[idx.sixes]?.text) ?? 0 : 0,
       dismissal,
-      notOut: !dismissal || /not\s*out|retired\s*(hurt|not out)|batting/i.test(dismissal),
+      notOut: starred || !dismissal || /not\s*out|retired\s*(hurt|not out)|batting/i.test(dismissal),
     });
   }
   return { batters: out, dnb };
@@ -194,7 +195,7 @@ function parseBowling(rows, cls, bpo) {
   return out;
 }
 
-function splitNames(s) {
+export function splitNames(s) {
   return String(s)
     .split(/,|;|\band\b|\n/)
     .map(cleanName)
@@ -207,19 +208,7 @@ function splitNames(s) {
  */
 export function parseScorecard(doc, { ballsPerOver = 6 } = {}) {
   for (const el of [...doc.querySelectorAll('script,style,noscript,svg')]) el.parentNode.removeChild(el);
-  const battingCards = [];
-  const bowlingCards = [];
-  for (const rows of readTables(doc)) {
-    const cls = classify(rows);
-    if (!cls) continue;
-    if (cls.kind === 'batting') {
-      const card = parseBatting(rows, cls);
-      if (card.batters.length || card.dnb.length) battingCards.push(card);
-    } else {
-      const bowlers = parseBowling(rows, cls, ballsPerOver);
-      if (bowlers.length) bowlingCards.push(bowlers);
-    }
-  }
+  const { battingCards, bowlingCards } = interpretTables(readTables(doc), ballsPerOver);
   // "Did not bat: A, B, C" often sits outside the table, as a plain paragraph
   const looseDnb = [];
   const bodyText = pageText(doc);
@@ -231,7 +220,30 @@ export function parseScorecard(doc, { ballsPerOver = 6 } = {}) {
     const t = txt(el.textContent);
     if (t && t.length <= 80) labels.add(t);
   }
-  return { battingCards, bowlingCards, looseDnb, labels: [...labels], meta: parseMeta(doc, bodyText) };
+  const titleEl = doc.querySelector('title');
+  const page = { title: txt(titleEl && titleEl.textContent), headings: [...doc.querySelectorAll('h1,h2,h3,h4')].map((h) => txt(h.textContent)).filter(Boolean) };
+  return { battingCards, bowlingCards, looseDnb, labels: [...labels], meta: parseMeta(page, bodyText) };
+}
+
+/**
+ * Turn tables (rows of cells: { text, linkText, lines, pid, colspan }) into batting and
+ * bowling cards. Used for HTML pages and for the PDF scorecard (lib/pdf.js).
+ */
+export function interpretTables(tables, ballsPerOver = 6) {
+  const battingCards = [];
+  const bowlingCards = [];
+  for (const rows of tables) {
+    const cls = classify(rows);
+    if (!cls) continue;
+    if (cls.kind === 'batting') {
+      const card = parseBatting(rows, cls);
+      if (card.batters.length || card.dnb.length) battingCards.push(card);
+    } else {
+      const bowlers = parseBowling(rows, cls, ballsPerOver);
+      if (bowlers.length) bowlingCards.push(bowlers);
+    }
+  }
+  return { battingCards, bowlingCards };
 }
 
 function pageText(doc) {
@@ -249,10 +261,8 @@ function pageText(doc) {
 
 const MONTHS = 'jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec';
 
-export function parseMeta(doc, bodyText) {
-  const titleEl = doc.querySelector('title');
-  const title = txt(titleEl && titleEl.textContent);
-  const headings = [...doc.querySelectorAll('h1,h2,h3,h4')].map((h) => txt(h.textContent)).filter(Boolean);
+/** Title, teams, result and date from the page title, headings and text (one block per line). */
+export function parseMeta({ title = '', headings = [] }, bodyText) {
   const vsSource = [title, ...headings, ...bodyText.split('\n').slice(0, 80)].find((s) => /\s(vs?\.?|versus)\s/i.test(s)) || '';
   let teams = [];
   const vs = vsSource.match(/(.+?)\s+(?:vs?\.?|versus)\s+(.+)/i);

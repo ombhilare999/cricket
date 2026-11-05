@@ -11,7 +11,8 @@
     "set-admin-password": "node scripts/set-admin-password.mjs"
   },
   "dependencies": {
-    "linkedom": "^0.18.5"
+    "linkedom": "^0.18.5",
+    "pdfjs-dist": "4.4.168"
   },
   "engines": {
     "node": ">=20"

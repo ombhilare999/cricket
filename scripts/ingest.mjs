@@ -9,6 +9,7 @@
 // Options:
 //   --tournament auto|lakeshore|mcl   default: detect from the league in the link
 //   --scorecard-html file.html        use a saved page instead of downloading
+//   --scorecard-pdf file.pdf          use the CricClubs scorecard PDF (link optional: read from its footer)
 //   --reparse                         re-read the raw page saved in data/raw/ (CLI only)
 //   --result file.md                  write a human-readable result
 //
@@ -19,7 +20,9 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { parseMatchUrl, detectTournament, buildMatch, RejectedMatch } from '../assets/js/lib/match.js';
+import { parseMatchUrl, detectTournament, buildMatch, buildMatchFromScorecard, RejectedMatch } from '../assets/js/lib/match.js';
+import { parsePdfScorecard } from '../assets/js/lib/pdf.js';
+import { pdfFileLines } from './lib/pdf.mjs';
 import { slimHtml as slim } from '../assets/js/lib/season.js';
 import { htmlToDoc } from './lib/dom.mjs';
 import { buildSeason } from './build-season.mjs';
@@ -32,6 +35,7 @@ const { values: args } = parseArgs({
     url: { type: 'string' },
     tournament: { type: 'string', default: 'auto' },
     'scorecard-html': { type: 'string' },
+    'scorecard-pdf': { type: 'string' },
     reparse: { type: 'boolean', default: false },
     result: { type: 'string' },
   },
@@ -63,7 +67,9 @@ async function download(url) {
 }
 
 async function main() {
-  const link = args.url;
+  let pdfCard = null;
+  if (args['scorecard-pdf']) pdfCard = parsePdfScorecard(await pdfFileLines(args['scorecard-pdf']));
+  const link = args.url || (pdfCard && pdfCard.link);
   if (!link) fail(2, 'No CricClubs full scorecard link found. It should look like https://cricclubs.com/MississaugaCricketLeague/fullScorecard.do?clubId=2565&matchId=8556');
 
   let info;
@@ -86,10 +92,13 @@ async function main() {
   const rawDir = join(ROOT, 'data/raw');
   mkdirSync(rawDir, { recursive: true });
   const rawPath = join(rawDir, `${info.id}.scorecard.html`);
+  const rawPdfPath = join(rawDir, `${info.id}.scorecard.pdf`);
+  const pdfPath = args['scorecard-pdf'] || (args.reparse && existsSync(rawPdfPath) ? rawPdfPath : null);
 
   let html;
   try {
-    if (args.reparse) html = readFileSync(rawPath, 'utf8');
+    if (pdfPath) pdfCard = pdfCard || parsePdfScorecard(await pdfFileLines(pdfPath));
+    else if (args.reparse) html = readFileSync(rawPath, 'utf8');
     else if (args['scorecard-html']) html = readFileSync(args['scorecard-html'], 'utf8');
     else html = await download(info.scorecardUrl);
   } catch (e) {
@@ -98,13 +107,18 @@ async function main() {
 
   let parsed;
   try {
-    parsed = buildMatch({ doc: htmlToDoc(html), players, config });
+    parsed = pdfCard ? buildMatchFromScorecard(pdfCard, { players, config }) : buildMatch({ doc: htmlToDoc(html), players, config });
   } catch (e) {
     if (e instanceof RejectedMatch) fail(2, e.message);
     fail(4, `Could not read the scorecard: ${e.message}`);
   }
+  if (pdfCard) parsed.source = 'pdf';
 
-  writeFileSync(rawPath, slim(html));
+  if (pdfPath) {
+    if (pdfPath !== rawPdfPath) writeFileSync(rawPdfPath, readFileSync(pdfPath));
+  } else {
+    writeFileSync(rawPath, slim(html));
+  }
   const prev = existsSync(matchPath) ? JSON.parse(readFileSync(matchPath, 'utf8')) : {};
   const record = {
     id: info.id,

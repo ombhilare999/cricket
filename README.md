@@ -12,26 +12,28 @@ The password check runs in the browser. The stats data itself (`data/*.json`) is
 ## Adding a match (admin)
 
 ```
-/cricket/admin/ → paste the CricClubs full scorecard link → "Open scorecard"
-        │ CricClubs opens in a new tab (in your own browser, so its bot check lets you in)
+CricClubs → open the match scorecard → "PDF"
+  (or paste the match link on /cricket/admin/ and press "Open PDF page")
+        │ save that page as a PDF: Cmd+P / Ctrl+P → Save as PDF
         ▼
-click the "Send to TBF" bookmark on that tab → the page comes back to the admin tab
+/cricket/admin/ → drop the PDF
+        │ pdf.js reads it in the browser; the match link printed in the PDF footer
+        │ identifies the match (or paste the link if the footer was turned off)
         ▼
-the admin page parses it, checks the rules and shows the stats
+the admin page checks the rules and shows the stats
 (unknown names: pick who they are; the CricClubs spelling is saved as an alias)
         ▼
 "Save match" → one commit to main: data/matches/<id>.json, data/season.json,
-data/raw/<id>.scorecard.html (and data/players.json if names were linked)
+data/raw/<id>.scorecard.pdf (and data/players.json if names were linked)
         ▼
 push → GitHub Actions "Deploy site" → omkarbhilare.com/cricket updates in about a minute
 ```
 
-CricClubs sits behind Cloudflare's bot protection, so neither GitHub Actions nor the website can download a scorecard from the link alone. The bookmark sends the page from your browser tab instead. Without a bookmarks bar (on a phone), save the scorecard page as HTML and choose the file on the admin page.
+CricClubs sits behind Cloudflare's bot protection, so neither GitHub Actions nor the website can download a scorecard on its own. It has to come from your own browser: the PDF is the main way. Under *Other ways* on the admin page there is also a **Send to TBF** bookmark and an upload for a saved HTML page.
 
 **One-time setup**
 
-1. Open `/cricket/admin/`, unlock with the password, and drag **Send to TBF** to your bookmarks bar.
-2. Create a GitHub [fine-grained token](https://github.com/settings/personal-access-tokens/new): Repository access *only* `ombhilare999/cricket`, Permissions → *Contents: Read and write*. Paste it under **Saving** and press **Connect**. The admin page encrypts it with the admin password (`data/admin-key.json`), so anyone with the password can save matches from any device.
+1. Create a GitHub [fine-grained token](https://github.com/settings/personal-access-tokens/new): Repository access *only* `ombhilare999/cricket`, Permissions → *Contents: Read and write*. Paste it under **Saving** and press **Connect**. The admin page encrypts it with the admin password (`data/admin-key.json`), so anyone with the password can save matches from any device.
 
 **Changing the password:** `npm run set-admin-password` (asks for the new password and the token), then commit `data/admin-key.json`.
 
@@ -41,7 +43,7 @@ CricClubs sits behind Cloudflare's bot protection, so neither GitHub Actions nor
 
 A match is added only if:
 
-1. the link is `https://(www.)cricclubs.com/<League>/fullScorecard.do?...matchId=<n>` and the league is one of ours (Lakeshore or Mississauga Cricket League),
+1. the link is `https://(www.)cricclubs.com/<League>/fullScorecard.do?...matchId=<n>` (or `scoreCardPdf.do`) and the league is one of ours (Lakeshore or Mississauga Cricket League),
 2. the scorecard shows the team **True Blue Falcons** by its exact name (`teamName` in `data/config.json`),
 3. **every** True Blue Falcons player on the scorecard (batters, did-not-bat, bowlers) matches a roster name in `data/players.json` exactly, or one of that player's `aliases`. Case, extra spaces, apostrophes and markers like `(c)`, `(wk)`, `*` and `†` are ignored. Anything else is linked by hand on the admin page.
 4. the match has not been added before.
@@ -69,7 +71,8 @@ A match is added only if:
 npm install
 npm test                          # parser tests (the same parser the admin page runs)
 npm run serve                     # http://localhost:8080/cricket/
-node scripts/ingest.mjs --url <link> --scorecard-html saved-page.html   # add a match from a saved page (CLI)
+node scripts/ingest.mjs --scorecard-pdf 'Score Card PDF.pdf'            # add a match from the PDF (CLI)
+node scripts/ingest.mjs --url <link> --scorecard-html saved-page.html   # or from a saved page
 npm run set-admin-password        # change the admin password / token
 ```
 

@@ -395,3 +395,7 @@ body.locked > :not(.lock):not(script) { display: none !important; }
   .inline .btn { width: 100%; }
   .maprow { grid-template-columns: 1fr; gap: 4px; }
 }
+.drop { display: grid; justify-items: center; gap: 4px; margin-top: 12px; padding: 26px 16px; border: 2px dashed var(--border); border-radius: 12px; background: var(--surface-2); cursor: pointer; text-align: center; transition: border-color 0.15s, background 0.15s; }
+.drop:hover, .drop.over { border-color: var(--blue-500); background: var(--blue-50); }
+.drop:focus-within { outline: 2px solid var(--blue-400); outline-offset: 2px; }
+.drop-icon { font-size: 22px; color: var(--blue-500); }

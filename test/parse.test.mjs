@@ -94,3 +94,28 @@ test('rejects a match that is not ours', () => {
   const partial = fixture.replaceAll('True Blue Falcons', 'True Blue Falcons B');
   assert.throws(() => buildMatch({ scorecardHtml: partial, players, config }), RejectedMatch, 'team name must be exact');
 });
+
+test('scorecard PDF (match 8556): reads both innings, picks ours, finds the link', async () => {
+  const { pdfFileLines } = await import('../scripts/lib/pdf.mjs');
+  const { parsePdfScorecard } = await import('../assets/js/lib/pdf.js');
+  const { buildMatchFromScorecard } = await import('../assets/js/lib/match.js');
+  const sc = parsePdfScorecard(await pdfFileLines(new URL('./fixtures/scorecard-8556.pdf', import.meta.url).pathname));
+  assert.equal(parseMatchUrl(sc.link).id, 'mississaugacricketleague-8556');
+  const m = buildMatchFromScorecard(sc, { players, config });
+  assert.equal(m.opponent, 'Hunters CC');
+  assert.equal(m.date, '2026-10-31');
+  assert.equal(m.result, 'True Blue Falcons won by 8 Wickets');
+  assert.equal(m.players.length, 12);
+  const by = Object.fromEntries(m.players.map((p) => [p.playerId, p]));
+  assert.deepEqual(by['alston-d-mello'].bat, { pos: 2, runs: 54, balls: 48, fours: 4, sixes: 2, notOut: true, dismissal: '' });
+  assert.equal(by['hritik-kumar-advani'].bat.notOut, false);
+  assert.equal(by['hardik-manchanda'].bat.runs, 21);
+  assert.equal(by['rajat-kumar-sinha'].batted, false, 'listed with 0 (0) and no dismissal = did not bat');
+  assert.equal(by['sadan-amin'].batted, false);
+  assert.equal(by['sadan-amin'].bowled, false);
+  assert.equal(by['zohaib-hassan'].bowl.wickets, 3);
+  assert.equal(by['ayush-aran'].bowl.maidens, 1);
+  assert.equal(by['vansh-tyagi'].bowl.wides, 8);
+  assert.equal(by['rana-mulhim-nadeem'].bowl.balls, 6);
+  assert.ok(!m.players.some((p) => ['taimoor-mirza', 'arsh-brar'].includes(p.playerId)), 'opponents are not ours');
+});

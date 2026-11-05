@@ -66,40 +66,44 @@
       <div class="sec-head">
         <div>
           <h2>Add a match</h2>
-          <p>Paste the CricClubs <b>full scorecard</b> link. Check the stats, then save. The public page updates about a minute later.</p>
+          <p>Upload the CricClubs scorecard PDF, check the stats, then save. The public page updates about a minute later.</p>
         </div>
       </div>
       <div class="add-grid">
         <div class="card add-card">
           <ol class="steps">
-            <li>
-              <div class="field" style="margin-top:0">
-                <label for="url">CricClubs full scorecard link</label>
-                <div class="inline">
-                  <input id="url" type="url" autocomplete="off" spellcheck="false" placeholder="https://www.cricclubs.com/MississaugaCricketLeague/fullScorecard.do?matchId=8556&amp;clubId=2565">
-                  <button class="btn" type="button" id="open">Open scorecard</button>
-                </div>
+            <li>On CricClubs, open the match scorecard and press <b>PDF</b>. Or paste the match link here:
+              <div class="inline" style="margin-top:8px">
+                <label for="url" class="sr-only">CricClubs match link</label>
+                <input id="url" type="url" autocomplete="off" spellcheck="false" placeholder="https://www.cricclubs.com/MississaugaCricketLeague/fullScorecard.do?matchId=8556&amp;clubId=2565">
+                <button class="btn ghost" type="button" id="open">Open PDF page</button>
               </div>
             </li>
-            <li>On the CricClubs tab that opens, wait for the scorecard to load, then click your <b>Send to TBF</b> bookmark. The stats appear below.</li>
+            <li>Save that page as a PDF: <b>Cmd+P</b> (Mac) or <b>Ctrl+P</b> (Windows) → <b>Save as PDF</b>. On a phone: Share → Print → Save to Files.</li>
+            <li>Drop the PDF here:</li>
           </ol>
+          <label class="drop" id="drop">
+            <input type="file" id="pdf" accept="application/pdf,.pdf" class="sr-only">
+            <span class="drop-icon" aria-hidden="true">⬆</span>
+            <b>Drop the scorecard PDF</b>
+            <span class="muted small">or tap to choose the file</span>
+          </label>
           <div class="msg" id="add-msg" role="status" aria-live="polite"></div>
           <div id="preview"></div>
         </div>
         <div class="card add-card side">
-          <h3>Send to TBF bookmark</h3>
-          <p class="muted small">One-time setup: drag this button to your bookmarks bar.</p>
-          <p><a class="btn bm" id="bookmarklet" href="#" title="Drag me to your bookmarks bar">★ Send to TBF</a></p>
-          <p class="muted small">CricClubs blocks websites and bots from downloading scorecards, so the scorecard has to come from your own browser tab. The bookmark sends it back here.</p>
+          <h3>Saving</h3>
+          <p class="muted small" id="save-status">Checking…</p>
           <details>
-            <summary>No bookmarks bar? (phone)</summary>
-            <p class="muted small">Save the scorecard page (<b>Cmd+S</b> / <b>Ctrl+S</b>) and choose the file here:</p>
+            <summary>Other ways to add a match</summary>
+            <p class="muted small"><b>Bookmark:</b> drag this to your bookmarks bar, open the scorecard with the button on the left, and click the bookmark on the CricClubs tab.</p>
+            <p><a class="btn bm" id="bookmarklet" href="#" title="Drag me to your bookmarks bar">★ Send to TBF</a></p>
+            <p class="muted small"><b>Saved web page:</b> save the scorecard page as HTML (Cmd+S) and choose it here:</p>
             <input type="file" id="file" accept=".html,.htm,text/html">
-            <p class="muted small">If the bookmark says it copied the page instead, paste it here:</p>
+            <p class="muted small">If the bookmark said it copied the page instead:</p>
             <button class="btn ghost" type="button" id="paste">Paste from clipboard</button>
           </details>
-          <h3 style="margin-top:18px">Saving</h3>
-          <p class="muted small" id="save-status">Checking…</p>
+          <p class="muted small" style="margin-top:14px">Why a PDF? CricClubs blocks websites and bots from downloading scorecards, so the scorecard has to come from your own browser.</p>
         </div>
       </div>
     </section>

@@ -14,15 +14,15 @@ export class RejectedMatch extends Error {
   }
 }
 
-const LINK_RE = /https:\/\/(?:www\.)?cricclubs\.com\/[A-Za-z0-9_-]+\/fullScorecard\.do\?[^\s<>"')\]]+/i;
+const LINK_RE = /https:\/\/(?:www\.)?cricclubs\.com\/[A-Za-z0-9_-]+\/(?:fullScorecard|scoreCardPdf)\.do\?[^\s<>"')\]]+/i;
 
-/** Find the first full-scorecard link in free text (e.g. an issue body). */
+/** Find the first full-scorecard or scorecard-PDF link in text (e.g. the footer a browser prints on a PDF). */
 export function findScorecardLink(text) {
   const m = String(text || '').match(LINK_RE);
   return m ? m[0].replace(/&amp;/g, '&') : null;
 }
 
-/** Validate a full-scorecard link and pull out league / clubId / matchId. */
+/** Validate a full-scorecard (or scorecard PDF) link and pull out league / clubId / matchId. */
 export function parseMatchUrl(input) {
   let u;
   try {
@@ -33,7 +33,7 @@ export function parseMatchUrl(input) {
   if (u.protocol !== 'https:' || !/^(www\.)?cricclubs\.com$/i.test(u.hostname)) throw new RejectedMatch('The link must be on https://cricclubs.com.');
   const parts = u.pathname.split('/').filter(Boolean);
   const league = parts[0];
-  if (parts.length !== 2 || parts[1].toLowerCase() !== 'fullscorecard.do') {
+  if (parts.length !== 2 || !['fullscorecard.do', 'scorecardpdf.do'].includes(parts[1].toLowerCase())) {
     throw new RejectedMatch('Use the full scorecard link, for example https://cricclubs.com/MississaugaCricketLeague/fullScorecard.do?clubId=2565&matchId=8556');
   }
   const q = Object.fromEntries([...u.searchParams].map(([k, v]) => [k.toLowerCase(), v]));
@@ -80,8 +80,12 @@ const isTeamLabel = (label, team) => norm(label).replace(LABEL_NOISE, ' ').repla
  * RejectedMatch explaining which rule failed.
  */
 export function buildMatch({ doc, players, config }) {
+  return buildMatchFromScorecard(parseScorecard(doc, { ballsPerOver: config.ballsPerOver || 6 }), { players, config });
+}
+
+/** Same rules, for innings cards already read from a page or a PDF (lib/pdf.js). */
+export function buildMatchFromScorecard(sc, { players, config }) {
   const matcher = buildMatcher(players);
-  const sc = parseScorecard(doc, { ballsPerOver: config.ballsPerOver || 6 });
 
   // rule 2: our exact team name is on the scorecard
   const teamOnPage = [...(sc.meta.teams || []), ...sc.labels].some((t) => isTeamLabel(t, config.teamName));
